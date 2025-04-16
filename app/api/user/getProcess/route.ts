@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { connectMongoDB } from "../../../../lib/mongodb";
-import DamageDetection from "../../../../models/DamageDetection";
+import { connectMongoDB } from "@/lib/mongodb";
+import DamageDetection from "@/models/DamageDetection";
 
 export async function GET(req: Request) {
     try {

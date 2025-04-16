@@ -22,6 +22,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "app/components/AuthProvider.tsx", "models/DamageDetails.js"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "app/components/AuthProvider.tsx", "models/DamageDetails.js", "lib/mongodb.js"],
   "exclude": ["node_modules"]
 }

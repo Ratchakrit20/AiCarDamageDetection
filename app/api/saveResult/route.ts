@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { connectMongoDB } from "../../../../lib/mongodb";
-import DamageDetection from "../../../../models/DamageDetection";
+import { connectMongoDB } from "@/lib/mongodb";
+import DamageDetection from "@/models/DamageDetection";
 import { v4 as uuidv4 } from "uuid";
 
 // Define a type for the damage object
