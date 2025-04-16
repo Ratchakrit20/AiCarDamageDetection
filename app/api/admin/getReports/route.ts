@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { connectMongoDB } from "@/lib/mongodb";
 import DamageReport from "@/models/Report";
-import User from "@/models/User"; // ✅ ดึงข้อมูล User
 
 export async function GET(req: Request) {
     try {
