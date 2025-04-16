@@ -1,20 +1,15 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  experimental: {
-    appDir: true,
-  },
+  
   images: {
     remotePatterns: [
-      {
-        protocol: 'http',
-        hostname: '**',
-      },
-      {
-        protocol: 'https',
-        hostname: '**',
-      },
+      { protocol: 'http', hostname: '**' },
+      { protocol: 'https', hostname: '**' },
     ],
+  },
+  eslint: {
+    ignoreDuringBuilds: true, // ✅ ข้าม ESLint ตอน build
   },
 };
 

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Navbar from '../components/Navbar';
-import Image from "next/image";
+
 
 interface DamageReport {
     _id: string;
@@ -38,7 +38,7 @@ export default function AdminPage() {
 
             const data = await res.json();
             if (data.data && Array.isArray(data.data)) {
-                const transformedData = data.data.map((report: any) => ({
+                const transformedData = data.data.map((report: Record<string, any>) => ({
                     _id: report._id || "",
                     report_id: report.report_id || "",
                     user_id: report.user_id ? { firstName: report.user_id.firstName, lastName: report.user_id.lastName } : null,
@@ -57,7 +57,7 @@ export default function AdminPage() {
 
     useEffect(() => {
         fetchReports();
-    }, [filter]);
+    }, [filter,]);
 
     const updateStatus = async (id: string, status: string, reason?: string) => {
         try {
