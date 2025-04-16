@@ -2,8 +2,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { v2 as cloudinary } from "cloudinary";
 import { Readable } from "stream";
-import { IncomingForm } from "formidable";
-import { promisify } from "util";
 import { v4 as uuidv4 } from "uuid";
 
 cloudinary.config({
