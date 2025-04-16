@@ -16,6 +16,7 @@
     "@fortawesome/free-solid-svg-icons": "^6.7.2",
     "@fortawesome/react-fontawesome": "^0.2.2",
     "axios": "^1.7.9",
+    "cloudinary": "^2.6.0",
     "framer-motion": "^12.1.0",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",

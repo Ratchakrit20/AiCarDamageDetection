@@ -1,16 +1,16 @@
+// app/api/upload/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { v2 as cloudinary } from "cloudinary";
+import { Readable } from "stream";
+import { IncomingForm } from "formidable";
+import { promisify } from "util";
 import { v4 as uuidv4 } from "uuid";
 
-const s3Client = new S3Client({
-    region: "us-east-1",
-    endpoint: "http://127.0.0.1:9000", // ✅ เปลี่ยนเป็น localhost หรือ 127.0.0.1 ก็ได้
-    credentials: {
-      accessKeyId: "minioadmin",
-      secretAccessKey: "minioadmin",
-    },
-  });
-  
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME!,
+  api_key: process.env.CLOUDINARY_API_KEY!,
+  api_secret: process.env.CLOUDINARY_API_SECRET!,
+});
 
 export async function POST(request: NextRequest) {
   const formData = await request.formData();
@@ -20,23 +20,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "No file uploaded" }, { status: 400 });
   }
 
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const fileName = uuidv4() + "-" + file.name;
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
 
-  const params = {
-    Bucket: "my-app-images",
-    Key: fileName,
-    Body: buffer,
-    ContentType: file.type,
-  };
+  const uploadStream = () =>
+    new Promise<string>((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: "car-damage", // optional folder
+          public_id: uuidv4().split("-")[0],
+        },
+        (err, result) => {
+          if (err || !result) {
+            reject(err);
+          } else {
+            resolve(result.secure_url);
+          }
+        }
+      );
+
+      Readable.from(buffer).pipe(stream);
+    });
 
   try {
-    await s3Client.send(new PutObjectCommand(params));
-    const fileUrl = `http://localhost:9000/my-app-images/${fileName}`;
-
-    return NextResponse.json({ url: fileUrl });
+    const uploadedUrl = await uploadStream();
+    return NextResponse.json({ url: uploadedUrl });
   } catch (error) {
-    console.error("❌ Upload Error:", error);
+    console.error("❌ Upload failed:", error);
     return NextResponse.json({ error: "Upload failed" }, { status: 500 });
   }
 }
