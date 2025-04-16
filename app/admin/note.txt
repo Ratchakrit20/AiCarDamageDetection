@@ -1,0 +1,118 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import Image from "next/image";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+
+interface DamageReport {
+    _id: string;
+    report_number: string;
+    user: { firstName: string; lastName: string };
+    car_info: { brand: string; model: string; year: string };
+    images: string[];
+    damages: { damage_part: string; detected_type: string; confidence: number; action_required: string }[];
+    status: string;
+}
+
+export default function AdminPage() {
+    const { data: session, status } = useSession();
+    const router = useRouter();
+    const [damageReports, setDamageReports] = useState<DamageReport[]>([]);
+    const [filter, setFilter] = useState("pending");
+
+    useEffect(() => {
+        if (status === "loading") return;
+        if (!session?.user || session.user.role !== "admin") {
+            router.push("/");
+        }
+    }, [session, status, router]);
+
+    useEffect(() => {
+        const fetchReports = async () => {
+            const res = await fetch(`/api/admin/getReports?status=${filter}`);
+            if (res.ok) {
+                setDamageReports(await res.json());
+            }
+        };
+        fetchReports();
+    }, [filter]);
+
+    const handleApprove = async (id: string) => {
+        await updateStatus(id, "approved");
+    };
+
+    const handleReject = async (id: string) => {
+        const reason = prompt("Enter rejection reason:");
+        if (reason) await updateStatus(id, "rejected", reason);
+    };
+
+    const updateStatus = async (id: string, status: string, reason?: string) => {
+        await fetch("/api/admin/updateStatus", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id, status, reason }),
+        });
+        setDamageReports((prev) => prev.filter((report) => report._id !== id));
+    };
+
+    return (
+        <div className="container mx-auto p-6">
+            <h1 className="text-3xl font-bold mb-4">Admin Panel - Damage Review</h1>
+
+            <div className="mb-4">
+                <label className="mr-2 font-bold">Filter:</label>
+                <select
+                    value={filter}
+                    onChange={(e) => setFilter(e.target.value)}
+                    className="border p-2 rounded"
+                >
+                    <option value="pending">Pending</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {damageReports.map((report) => (
+                    <div key={report._id} className="border p-4 rounded-lg shadow">
+                        <p className="text-lg font-bold">Report #{report.report_number}</p>
+                        <p>User: {report.user.firstName} {report.user.lastName}</p>
+                        <p>Car: {report.car_info.brand} {report.car_info.model} ({report.car_info.year})</p>
+
+                        {/* แสดงภาพที่อัปโหลด */}
+                        <div className="flex space-x-2 mt-2">
+                            {report.images.map((img, index) => (
+                                <Image key={index} src={img} alt="Damage Image" width={100} height={100} className="rounded-lg" />
+                            ))}
+                        </div>
+
+                        {/* รายละเอียดความเสียหาย */}
+                        <div className="mt-4">
+                            {report.damages.map((damage, i) => (
+                                <p key={i}>
+                                    {damage.damage_part} - {damage.detected_type} ({damage.confidence.toFixed(2)}%) → 
+                                    <span className={`font-bold ${damage.action_required === "replace" ? "text-red-500" : "text-green-500"}`}>
+                                        {damage.action_required.toUpperCase()}
+                                    </span>
+                                </p>
+                            ))}
+                        </div>
+
+                        {/* ปุ่ม Approve / Reject */}
+                        {filter === "pending" && (
+                            <div className="flex gap-2 mt-3">
+                                <button className="bg-green-500 text-white px-3 py-1 rounded" onClick={() => handleApprove(report._id)}>
+                                    Approve
+                                </button>
+                                <button className="bg-red-500 text-white px-3 py-1 rounded" onClick={() => handleReject(report._id)}>
+                                    Reject
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}

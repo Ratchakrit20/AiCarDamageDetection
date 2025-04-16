@@ -1,0 +1,166 @@
+"use client";
+
+import React, { useState, useRef } from "react";
+import Image from "next/image";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import Navbar from "../../components/Navbar";
+
+export default function ImageUploadForm() {
+    const { data: session } = useSession();
+    const router = useRouter();
+    console.log(session);
+
+    const [uploadMode, setUploadMode] = useState<"single" | "multiple">("single");
+    const [uploadedFiles, setUploadedFiles] = useState<{ [key: string]: File | null }>({
+        single: null,
+        Front: null,
+        Back: null,
+        Left: null,
+        Right: null,
+    });
+
+    const fileInputRefs = {
+        single: useRef<HTMLInputElement>(null),
+        multiple: {
+            Front: useRef<HTMLInputElement>(null),
+            Back: useRef<HTMLInputElement>(null),
+            Left: useRef<HTMLInputElement>(null),
+            Right: useRef<HTMLInputElement>(null),
+        },
+    };
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, key: string) => {
+        if (event.target.files?.length) {
+            setUploadedFiles((prev) => ({ ...prev, [key]: event.target.files![0] }));
+        }
+    };
+
+    const handleRemoveFile = (key: string) => {
+        setUploadedFiles((prev) => ({ ...prev, [key]: null }));
+    };
+
+    const handleSubmit = async () => {
+        const formData = new FormData();
+        // const apiUrl = "https://d6b0-34-138-252-247.ngrok-free.app/detect_damage"; // ใส่ URL ngrok ที่ได้จาก backend
+        const apiUrl = "https://7376-34-126-80-84.ngrok-free.app/detect_damage";
+        if (uploadMode === "single" && uploadedFiles.single) {
+            formData.append("image", uploadedFiles.single);
+        } else {
+            ["Front", "Back", "Left", "Right"].forEach((pos) => {
+                if (uploadedFiles[pos]) {
+                    formData.append("image", uploadedFiles[pos]!);
+                }
+            });
+        }
+
+        try {
+            const response = await fetch(apiUrl, {
+                method: "POST",
+                body: formData,
+            });
+
+            if (!response.ok) throw new Error("Failed to upload image");
+
+            const blob = await response.blob();
+            const imageUrl = URL.createObjectURL(blob);
+
+            // ส่งไปที่ result พร้อมกับ URL ของภาพ
+            router.push(`/AiCarDamgeDetection/Detecting/result?image=${encodeURIComponent(imageUrl)}`);
+        } catch (error) {
+            console.error("Upload error:", error);
+        }
+    };
+
+    return (
+        <div>
+            <Navbar />
+
+            <div className="flex flex-col items-center justify-center bg-white text-black p-6">
+                {/* Toggle Switch */}
+                <div className="flex bg-gray-200 p-2 rounded-full w-80 justify-between">
+                    <button
+                        className={`flex-1 py-2 mx-1 text-center rounded-full transition-all duration-300 ${
+                            uploadMode === "single" ? "bg-orange-500 text-white scale-105 shadow-lg" : "bg-gray-400 text-gray-200"
+                        }`}
+                        onClick={() => setUploadMode("single")}
+                    >
+                        Single Image
+                    </button>
+                    <button
+                        className={`flex-1 py-2 mx-1 text-center rounded-full transition-all duration-300 ${
+                            uploadMode === "multiple" ? "bg-orange-500 text-white scale-105 shadow-lg" : "bg-gray-400 text-gray-200"
+                        }`}
+                        onClick={() => setUploadMode("multiple")}
+                    >
+                        Multiple Image
+                    </button>
+                </div>
+
+                {/* Upload Section */}
+                <div className="mt-6 w-full max-w-lg">
+                    <AnimatePresence mode="wait">
+                        {uploadMode === "single" ? (
+                            <motion.div
+                                key="single"
+                                initial={{ opacity: 0, y: -20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.5, ease: "easeInOut" }}
+                                className="p-6 rounded-xl flex flex-col items-center border-2 cursor-pointer hover:border-gray-900 transition-all duration-300"
+                                onClick={() => fileInputRefs.single.current?.click()}
+                            >
+                                <Image src="/img/upload-icon.png" width={50} height={50} alt="Upload Image" />
+                                <p className="text-gray-600 mt-2">
+                                    {uploadedFiles.single ? `Uploaded: ${uploadedFiles.single.name}` : "Car Damaged Image"}
+                                </p>
+                                <input
+                                    type="file"
+                                    className="hidden"
+                                    ref={fileInputRefs.single}
+                                    onChange={(e) => handleFileChange(e, "single")}
+                                />
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                key="multiple"
+                                initial={{ opacity: 0, y: -20 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -20 }}
+                                transition={{ duration: 0.5, ease: "easeInOut" }}
+                                className="grid grid-cols-2 gap-4"
+                            >
+                                {(["Front", "Back", "Left", "Right"] as const).map((position) => (
+                                    <div
+                                        key={position}
+                                        className="w-full h-48 p-4 rounded-xl flex flex-col items-center justify-center border-2 cursor-pointer hover:border-gray-900 transition-all duration-300"
+                                        onClick={() => fileInputRefs.multiple[position as keyof typeof fileInputRefs.multiple]?.current?.click()}
+                                    >
+                                        <Image src={`/img/car-${position}.png`} width={80} height={80} alt={`${position} Image`} />
+                                        <input
+                                            type="file"
+                                            className="hidden"
+                                            ref={fileInputRefs.multiple[position as keyof typeof fileInputRefs.multiple]}
+                                            onChange={(e) => handleFileChange(e, position)}
+                                        />
+                                    </div>
+                                ))}
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {/* Submit Button */}
+                <motion.button
+                    whileTap={{ scale: 0.9 }}
+                    whileHover={{ scale: 1.05 }}
+                    className="mt-6 bg-orange-500 px-10 py-2 rounded-full text-white font-bold hover:bg-orange-600 transition"
+                    onClick={handleSubmit}
+                >
+                    Analyze Damage
+                </motion.button>
+            </div>
+        </div>
+    );
+}

@@ -1,0 +1,180 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+import Image from "next/image";
+
+interface DamageDetail {
+    damage_part: string;
+    detected_type: string;
+    damage_area: number;
+    confidence: number;
+    action_required: string;
+    cost: number;
+}
+
+interface DamageReport {
+    report_id: string;
+    car_info: { brand: string; model: string; year: string };
+    images: string[];
+    damages: DamageDetail[];
+    total_cost: number;
+    status: string;
+    createdAt: string;
+}
+
+export default function ReportDetailPage() {
+    const { id } = useParams();
+    const router = useRouter();
+    const [report, setReport] = useState<DamageReport | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        if (!id) return;
+
+        const fetchReport = async () => {
+            try {
+                const res = await fetch(`/api/user/getReportById?id=${id}`);
+                const data = await res.json();
+
+                if (!res.ok) throw new Error(data.message || "Failed to fetch report");
+
+                setReport(data.data);
+            } catch (err) {
+                console.error("❌ Fetch Error:", err);
+                setError("Error fetching report details");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchReport();
+    }, [id]);
+
+    // ✅ ฟังก์ชันสร้าง PDF
+    const generatePDF = () => {
+        if (!report) return;
+
+        const doc = new jsPDF();
+        doc.setFont("helvetica", "bold");
+        doc.text("Damage Report", 14, 15);
+
+        // ✅ ข้อมูลรถ
+        doc.setFontSize(12);
+        doc.text(`Report ID: ${report.report_id}`, 14, 25);
+        doc.text(`Car: ${report.car_info.brand} ${report.car_info.model} (${report.car_info.year})`, 14, 35);
+        doc.text(`Created At: ${new Date(report.createdAt).toLocaleString()}`, 14, 45);
+
+        // ✅ ตารางแสดงความเสียหาย
+        autoTable(doc, {
+            startY: 55,
+            head: [["Part", "Type", "Damage Area", "Confidence", "Action", "Cost"]],
+            body: report.damages.map((damage) => [
+                damage.damage_part,
+                damage.detected_type,
+                `${damage.damage_area.toFixed(2)}%`,
+                `${damage.confidence.toFixed(2)}%`,
+                damage.action_required.toUpperCase(),
+                `$${damage.cost.toFixed(2)}`,
+            ]),
+        });
+
+        // ✅ แสดงราคารวม
+        const finalY = (doc as any).lastAutoTable?.finalY || 70;
+        doc.text(`Total Cost: $${report.total_cost.toFixed(2)}`, 14, finalY + 10);
+
+        // ✅ ดาวน์โหลด PDF
+        doc.save(`Report_${report.report_id}.pdf`);
+    };
+
+    return (
+        <div className="container mx-auto p-6">
+            <h1 className="text-3xl font-bold mb-6">Report Details</h1>
+
+            {loading && <p>Loading...</p>}
+            {error && <p className="text-red-500">{error}</p>}
+
+            {report && (
+                <div className="bg-gray-900 p-6 rounded-lg shadow-lg">
+                    <p className="text-lg text-white">Report ID: <span className="font-bold">{report.report_id}</span></p>
+                    <p className="text-gray-400">Created At: {new Date(report.createdAt).toLocaleString()}</p>
+
+                    {/* ✅ ข้อมูลรถ */}
+                    <div className="mt-4">
+                        <h2 className="text-xl font-bold">Car Information</h2>
+                        <p>Brand: <span className="text-red-400">{report.car_info.brand}</span></p>
+                        <p>Model: <span className="text-orange-400">{report.car_info.model}</span></p>
+                        <p>Year: <span className="text-yellow-400">{report.car_info.year}</span></p>
+                    </div>
+
+                    {/* ✅ รูปภาพที่อัปโหลด */}
+                    <div className="mt-4">
+                        <h2 className="text-xl font-bold">Uploaded Images</h2>
+                        <div className="flex space-x-4">
+                            {report.images.length > 0 ? (
+                                report.images.map((img, index) => (
+                                    <Image key={index} src={img} alt="Damage Image" width={150} height={150} className="rounded-lg" />
+                                ))
+                            ) : (
+                                <p className="text-gray-400">No images available</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* ✅ ตารางแสดงความเสียหาย */}
+                    <div className="mt-6">
+                        <h2 className="text-xl font-bold">Damage Details</h2>
+                        <table className="w-full text-center mt-3 bg-gray-800 rounded-lg overflow-hidden">
+                            <thead className="bg-gray-700">
+                                <tr>
+                                    <th className="p-2">Part</th>
+                                    <th className="p-2">Type</th>
+                                    <th className="p-2">Area</th>
+                                    <th className="p-2">Confidence</th>
+                                    <th className="p-2">Action</th>
+                                    <th className="p-2">Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {report.damages.length > 0 ? (
+                                    report.damages.map((damage, index) => (
+                                        <tr key={index} className="border-b border-gray-700">
+                                            <td className="p-2">{damage.damage_part}</td>
+                                            <td className="p-2">{damage.detected_type}</td>
+                                            <td className="p-2">{damage.damage_area.toFixed(2)}%</td>
+                                            <td className="p-2">{damage.confidence.toFixed(2)}%</td>
+                                            <td className={`p-2 font-bold ${damage.action_required === "replace" ? "text-red-500" : "text-green-500"}`}>
+                                                {damage.action_required.toUpperCase()}
+                                            </td>
+                                            <td className="p-2">${damage.cost.toFixed(2)}</td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={6} className="p-2 text-gray-400">No damage details available</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* ✅ ปุ่ม Download PDF */}
+                    {report.status === "approved" && (
+                        <button onClick={generatePDF} className="mt-6 bg-blue-500 px-6 py-2 rounded-md text-white font-bold hover:bg-blue-600 transition">
+                            Download PDF
+                        </button>
+                    )}
+
+                    {/* ✅ ปุ่มกลับ */}
+                    <button onClick={() => router.push("/AiCarDamgeDetection/process")} className="mt-6 ml-4 bg-orange-500 px-6 py-2 rounded-md text-white font-bold hover:bg-orange-600 transition">
+                        Back to Process
+                    </button>
+                </div>
+            )}
+        </div>
+    );
+}

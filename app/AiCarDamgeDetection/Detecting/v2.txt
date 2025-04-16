@@ -1,0 +1,218 @@
+"use client";
+
+import { useState } from "react";
+import axios from "axios";
+import Image from "next/image";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+
+interface DamageInfo {
+  damage_name: string;
+  overlap_ratio: number;
+}
+
+interface DetectionResult {
+  part_name: string;
+  damages: DamageInfo[];
+}
+
+interface APIResponse {
+  results: {
+    result: {
+      detection_results: DetectionResult[];
+      output_image_base64: string;
+    };
+  }[];
+}
+
+export default function CarDetect() {
+  const { data: session } = useSession();
+  const router = useRouter();
+  
+  const [selectedFiles, setSelectedFiles] = useState<{ [key: string]: File | null }>({
+    front: null,
+    back: null,
+    left: null,
+    right: null,
+  });
+  const [originalImages, setOriginalImages] = useState<{ [key: string]: string | null }>({
+    front: null,
+    back: null,
+    left: null,
+    right: null,
+  });
+  const [mode, setMode] = useState("single");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<APIResponse | null>(null);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, position: string) => {
+    if (e.target.files && e.target.files[0]) {
+      setSelectedFiles(prev => ({ ...prev, [position]: e.target.files![0] }));
+      setOriginalImages(prev => ({ ...prev, [position]: URL.createObjectURL(e.target.files![0]) }));
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (mode === "multiple" && Object.values(selectedFiles).every(file => file === null)) {
+      alert("Please upload all four images before calculating.");
+      return;
+    }
+    if (mode === "single" && !selectedFiles.front) {
+      alert("Please upload an image before calculating.");
+      return;
+    }
+    
+    const formData = new FormData();
+    Object.keys(selectedFiles).forEach(key => {
+      if (selectedFiles[key]) {
+        formData.append("images", selectedFiles[key]!);
+      }
+    });
+    
+    try {
+      setLoading(true);
+      const response = await axios.post(
+        "https://a018-34-173-175-55.ngrok-free.app/detect_damage_all/",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+      setResult(response.data as APIResponse);
+      console.log("Result:", JSON.stringify(response.data));
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      alert("Error detecting car damage. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white flex justify-center items-center">
+      <div className="w-[900px] p-6 bg-gray-800 rounded-lg shadow-lg">
+        <h1 className="text-xl font-semibold">Car Damage Detection</h1>
+        
+        <div className="flex justify-center mt-4">
+          <button
+            className={`px-4 py-2 ${mode === "single" ? "bg-gray-700" : "bg-gray-600"} text-white rounded-l-lg`}
+            onClick={() => setMode("single")}
+          >
+            Single Image
+          </button>
+          <button
+            className={`px-4 py-2 ${mode === "multiple" ? "bg-orange-600" : "bg-gray-600"} text-white rounded-r-lg`}
+            onClick={() => setMode("multiple")}
+          >
+            Multiple Image
+          </button>
+        </div>
+        
+        {/* Single Image Upload Section */}
+        {mode === "single" && (
+          <div className="flex flex-col items-center justify-center w-full mt-6">
+            <label
+              className="w-full h-64 flex flex-col items-center justify-center border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-gray-400"
+            >
+              <input
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleFileChange(e, "front")}
+              />
+              {originalImages.front ? (
+                <Image
+                  src={originalImages.front}
+                  alt="Uploaded Image"
+                  width={300}
+                  height={200}
+                  className="rounded-lg shadow-lg"
+                />
+              ) : (
+                <div className="text-gray-400 flex flex-col items-center">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-12 w-12 mb-2"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      d="M3 16s3-2 6-2 6 2 6 2 3-2 6-2m-6 6s3-2 6-2 6 2 6 2m-6 6s3-2 6-2 6 2 6 2"
+                    />
+                  </svg>
+                  <p className="text-sm">Car Damaged Image</p>
+                  <p className="text-xs text-gray-500">File should not exceed 5MB</p>
+                </div>
+              )}
+            </label>
+          </div>
+        )}
+         {mode === "multiple" && (
+          <div className="grid grid-cols-2 gap-4 mt-6">
+            {Object.keys(selectedFiles).map((position, index) => (
+              <label
+                key={index}
+                className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed border-gray-600 rounded-lg cursor-pointer hover:border-gray-400"
+              >
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => handleFileChange(e, position)}
+                />
+                {originalImages[position] ? (
+                  <Image
+                    src={originalImages[position]!}
+                    alt="Uploaded Image"
+                    width={200}
+                    height={150}
+                    className="rounded-lg shadow-lg"
+                  />
+                ) : (
+                  <div className="text-gray-400 flex flex-col items-center">
+                    <p className="text-sm">{position.charAt(0).toUpperCase() + position.slice(1)} of Car Image</p>
+                    <p className="text-xs text-gray-500">File should not exceed 5MB</p>
+                  </div>
+                )}
+              </label>
+            ))}
+          </div>
+        )}
+        <button
+          onClick={handleSubmit}
+          disabled={loading}
+          className="w-full bg-orange-500 hover:bg-orange-600 text-white py-2 px-4 rounded-lg font-semibold mt-6"
+        >
+          {loading ? "Processing..." : "Calculate"}
+        </button>
+                {result && (
+          <div className="mt-6">
+            <h3 className="text-white font-semibold">Detection Results:</h3>
+            <table className="w-full mt-2 border-collapse border border-gray-600 text-white text-sm">
+              <thead>
+                <tr className="bg-gray-700 text-center">
+                  <th className="border border-gray-500 p-2">Damaged Part</th>
+                  <th className="border border-gray-500 p-2">Damage Type</th>
+                  <th className="border border-gray-500 p-2">Damage Area</th>
+                  <th className="border border-gray-500 p-2">Recommend</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.results[0].result.detection_results.map((damage, index) => (
+                  <tr key={index} className="text-center">
+                    <td className="border border-gray-500 p-2">{damage.part_name}</td>
+                    <td className="border border-gray-500 p-2">{damage.damages.map(d => d.damage_name).join(", ")}</td>
+                    <td className="border border-gray-500 p-2">{(Math.max(...damage.damages.map(d => d.overlap_ratio)) * 100).toFixed(2)}%</td>
+                    <td className={`border border-gray-500 p-2 ${Math.max(...damage.damages.map(d => d.overlap_ratio)) * 100 > 50 ? 'bg-red-500' : 'bg-green-500'}`}>{Math.max(...damage.damages.map(d => d.overlap_ratio)) * 100 > 50 ? "REPLACE" : "REPAIR"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
