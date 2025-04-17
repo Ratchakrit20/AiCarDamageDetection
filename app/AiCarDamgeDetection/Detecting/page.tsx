@@ -301,7 +301,7 @@ export default function CarDetect() {
       const carDetails = await fetchUserInsurance();
 
       const response = await axios.post<APIResponse>(
-        "https://7e11-34-169-3-101.ngrok-free.app/detect_damage_all/",
+        "https://b69f-34-125-86-59.ngrok-free.app/detect_damage_all/",
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
