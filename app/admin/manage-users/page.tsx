@@ -171,7 +171,9 @@ export default function ManageUsers() {
 
             {editMode[user._id] && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                {["policy_number", "insurance_type", "policy_start_date", "policy_end_date", "car_brand", "car_model", "car_year", "license_plate", "claim_limit", "coverage_details"].map((field) => (
+                {["policy_number", "insurance_type", "policy_start_date", "policy_end_date", "car_brand",
+                 "car_model", "car_year", "license_plate", "claim_limit", "coverage_details"]
+                .map((field) => (
                   <input
                     key={field}
                     type={["car_year", "claim_limit"].includes(field) ? "number" : "text"}

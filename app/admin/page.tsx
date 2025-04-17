@@ -57,6 +57,7 @@ export default function AdminPage() {
 
     useEffect(() => {
         fetchReports();
+    
     }, [filter,]);
 
     const updateStatus = async (id: string, status: string, reason?: string) => {

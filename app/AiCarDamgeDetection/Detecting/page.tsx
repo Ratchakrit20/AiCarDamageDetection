@@ -80,7 +80,7 @@ const positions = ["Left", "Right", "Front", "Back"];
 export default function CarDetect() {
 
   const { data: session, status } = useSession(); // ✅ ดึง session
-  const userId = session?.user?.id; // ✅ ตรวจสอบ userId
+  const userId = session?.user?.id; // ✅ ตรวจสอบ userIdD
   const [damageData, setDamageData] = useState<DamageData[]>([]);
   const [results, setResults] = useState<APIResponse[]>([]); // เก็บผลลัพธ์สำหรับแต่ละรูปภาพ
   const router = useRouter();
@@ -301,7 +301,7 @@ export default function CarDetect() {
       const carDetails = await fetchUserInsurance();
 
       const response = await axios.post<APIResponse>(
-        "https://dd1d-34-125-86-59.ngrok-free.app/detect_damage_all/",
+        "https://03f4-34-125-153-207.ngrok-free.app/detect_damage_all/",
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
@@ -931,7 +931,7 @@ export default function CarDetect() {
                               <div className=" bg-[#4a3a7d] border-b border-[#4a3a7d]">
                                 <h4 className="font-semibold text-purple-100 flex items-center">
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                    <path strokeLinecap="round" strokeLinejoin="round"  />
                                   </svg>
                                   Original Image
                                 </h4>
@@ -950,7 +950,6 @@ export default function CarDetect() {
                                 )}
                               </div>
                             </div>
-
                             {/* Processed Image Card */}
                             <div className="bg-[#3a2a6d] rounded-lg overflow-hidden border border-[#4a3a7d]">
                               <div className=" bg-[#4a3a7d] border-b border-[#4a3a7d]">
@@ -1004,21 +1003,18 @@ export default function CarDetect() {
                                         <span className="font-medium text-white">{damage.part_name}</span>
                                       </div>
                                     </td>
-
                                     {/* Damage Types */}
                                     <td className=" border-b border-[#4a3a7d]/50  p-3">
                                       <div className="flex flex-wrap gap-2 justify-center">
                                         {damage.damages.map((d, i) => (
                                           <span
                                             key={i}
-                                            className="bg-[#2e2649] border-2 text-white border-[#5e17eb] text-[10px] px-1 rounded-full"
-                                          >
+                                            className="bg-[#2e2649] border-2 text-white border-[#5e17eb] text-[10px] px-1 rounded-full">
                                             {d.damage_name}
                                           </span>
                                         ))}
                                       </div>
                                     </td>
-
                                     {/* Damage Area */}
                                     <td className="py-4 px-4">
                                       <div className="flex items-center">
@@ -1033,8 +1029,6 @@ export default function CarDetect() {
                                         </div>
                                       </div>
                                     </td>
-
-
                                     {/* Recommendation */}
                                     <td className="py-4 px-4">
                                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${damage.recommend === "REPLACE"
