@@ -56,18 +56,7 @@ function Navbar() {
 
                                         </a>
                                     </li>
-                                    <li>
-                                        {session.user?.role === "admin" && (
-                                            
-                                                <a
-                                                    className="relative text-white hover:text-[#5e17eb48] transition duration-300 after:content-[''] after:absolute after:left-0 after:-bottom-1 after:w-full after:h-[3px] after:bg-[#5e17eb48] after:scale-x-0 hover:after:scale-x-100 after:transition-transform after:duration-300"
-                                                    href="/AiModels"
-                                                >
-                                                    AI Management
-                                                </a>
-                                            
-                                        )}
-                                    </li>
+                                   
                                 </ul>
 
                                 <div className="flex items-center px-1  border-2 border-[#5e17eb48] rounded-full text-white gap-1">
