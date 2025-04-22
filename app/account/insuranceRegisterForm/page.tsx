@@ -60,5 +60,5 @@ export default function RegisterOwnershipPage() {
         <p className="mt-2">{status}</p>
       </form>
     </div>
-  );
+  );//dwwdw
 }
