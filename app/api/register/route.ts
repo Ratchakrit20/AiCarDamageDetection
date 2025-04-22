@@ -20,8 +20,8 @@ export async function POST(req: Request) {
             password: hashedPassword,
             role: "user", // ✅ ค่า default เป็น "user"
         });
-        return NextResponse.redirect(new URL('/login', req.url));
-
+        // return NextResponse.redirect(new URL('/login', req.url));
+        return NextResponse.json({ message: "User registration successful" }, { status: 200 });
         
     } catch (error) {
         console.error(error);
