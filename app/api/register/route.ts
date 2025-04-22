@@ -20,7 +20,9 @@ export async function POST(req: Request) {
             password: hashedPassword,
             role: "user", // ✅ ค่า default เป็น "user"
         });
-        return NextResponse.json({ message: 'Account created successfully'});
+        return NextResponse.redirect(new URL('/login', req.url));
+
+        
     } catch (error) {
         console.error(error);
         return NextResponse.json({ message: 'Internal Server Error' }, { status: 500 });

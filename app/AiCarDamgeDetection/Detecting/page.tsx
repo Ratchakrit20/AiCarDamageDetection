@@ -77,8 +77,9 @@ interface PricingResponse {
 const positions = ["Left", "Right", "Front", "Back"];
 
 
-export default function CarDetect() {
 
+export default function CarDetect() {
+  const [activeTab, setActiveTab] = useState("single");
   const { data: session, status } = useSession(); // ✅ ดึง session
   const userId = session?.user?.id; // ✅ ตรวจสอบ userIdD
   const [damageData, setDamageData] = useState<DamageData[]>([]);
@@ -140,53 +141,51 @@ export default function CarDetect() {
   }, []);
 
   useEffect(() => {
-    if (results.length > 0 && results[0]?.results?.[0]?.result?.detection_results) {
-      const tempData = results[0].results[0].result.detection_results.map((damage) => ({
-        part_name: damage.part_name.trim(),
-        overlap_ratio: Math.max(...(damage.damages ?? []).map((d) => d.overlap_ratio), 0) * 100,
-        color: damage.color || "#999999",
-        damages: damage.damages ?? [],
-      }));
-
-      // รวมข้อมูลซ้ำกัน
-      const combinedDamageData = Object.values(
-        tempData.reduce((acc, curr) => {
+    if (activeTab === "multiple" && results.length > 0) {
+      const allDamage = results.flatMap(r =>
+        r.results[0].result.detection_results.map((damage) => ({
+          part_name: damage.part_name.trim(),
+          overlap_ratio: Math.max(...(damage.damages ?? []).map((d) => d.overlap_ratio), 0) * 100,
+          color: damage.color || "#999999",
+          damages: damage.damages ?? [],
+        }))
+      );
+  
+      // 🔁 รวม part_name ซ้ำ และรวม damage_name โดยเลือก overlap มากสุด
+      const combined = Object.values(
+        allDamage.reduce((acc, curr) => {
           if (!acc[curr.part_name]) {
-            acc[curr.part_name] = curr;
+            acc[curr.part_name] = { ...curr };
           } else {
-            // เลือกค่า overlap_ratio ที่มากที่สุด
-            acc[curr.part_name].overlap_ratio = Math.max(
-              acc[curr.part_name].overlap_ratio,
-              curr.overlap_ratio
-            );
-            // รวม damages ที่ไม่ซ้ำกัน
-            acc[curr.part_name].damages = Array.from(
-              new Map(
-                [...acc[curr.part_name].damages, ...curr.damages].map((item) => [
-                  item.damage_name,
-                  item,
-                ])
-              ).values()
-            );
+            acc[curr.part_name].overlap_ratio = Math.max(acc[curr.part_name].overlap_ratio, curr.overlap_ratio);
+  
+            const merged = new Map<string, DamageInfo>();
+            [...acc[curr.part_name].damages, ...curr.damages].forEach((d) => {
+              const existing = merged.get(d.damage_name);
+              if (!existing || d.overlap_ratio > existing.overlap_ratio) {
+                merged.set(d.damage_name, d);
+              }
+            });
+  
+            acc[curr.part_name].damages = Array.from(merged.values());
           }
           return acc;
         }, {} as Record<string, DamageData>)
       );
-
-      setDamageData(combinedDamageData);
-    } else {
-      setDamageData([]);
+  
+      setDamageData(combined);
     }
-  }, [results]);
+  }, [results, activeTab]);
+  
 
 
-  const [activeTab, setActiveTab] = useState("single");
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [selectedFileMultiple, setSelectedFileMultiple] = useState<(File | null)[]>(Array(4).fill(null));
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [originalImages, setOriginalImages] = useState<(string | null)[]>(Array(4).fill(null)); // เก็บ URL ของรูปภาพต้นฉบับ
-
+  const [previewURL, setPreviewURL] = useState<string | null>(null);
   const handleTabSwitch = (tab: string) => {
     setActiveTab(tab);
     setSelectedFile(null);
@@ -200,6 +199,7 @@ export default function CarDetect() {
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0];
       setSelectedFile(file);
+      setPreviewURL(URL.createObjectURL(file));
       setOriginalImages([URL.createObjectURL(file), ...Array(3).fill(null)]);
     }
   };
@@ -301,7 +301,7 @@ export default function CarDetect() {
       const carDetails = await fetchUserInsurance();
 
       const response = await axios.post<APIResponse>(
-        "https://03f4-34-125-153-207.ngrok-free.app/detect_damage_all/",
+        "https://a121-35-231-83-210.ngrok-free.app/detect_damage_all/",
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
@@ -366,6 +366,32 @@ export default function CarDetect() {
       );
 
       // สร้างรายงาน
+      const uniqueDamages = Object.values(
+        damageData.reduce((acc, curr) => {
+          const partName = curr.part_name;
+      
+          if (!acc[partName]) {
+            acc[partName] = { ...curr };
+          } else {
+            // เอา overlap_ratio มากสุด
+            acc[partName].overlap_ratio = Math.max(acc[partName].overlap_ratio, curr.overlap_ratio);
+      
+            // รวม damage_name ที่ไม่ซ้ำ โดยเอา overlap สูงสุดของแต่ละชื่อ
+            const merged = new Map<string, DamageInfo>();
+            [...acc[partName].damages, ...curr.damages].forEach((d) => {
+              const existing = merged.get(d.damage_name);
+              if (!existing || d.overlap_ratio > existing.overlap_ratio) {
+                merged.set(d.damage_name, d);
+              }
+            });
+      
+            acc[partName].damages = Array.from(merged.values());
+          }
+      
+          return acc;
+        }, {} as Record<string, DamageData>)
+      );
+      
       const reportData = {
         report_id: uuidv4(),
         user_id: session.user.id,
@@ -378,7 +404,7 @@ export default function CarDetect() {
           ...originalImages.filter(Boolean), // รูปภาพต้นฉบับ
           ...processedImageUrls, // รูปภาพที่ประมวลผลแล้ว
         ],
-        damages: damageData.map((dmg) => ({
+        damages: uniqueDamages.map((dmg) => ({
           damage_part: dmg.part_name,
           detected_type: dmg.damages.map(d => d.damage_name).join(", "),
           damage_area: parseFloat(dmg.overlap_ratio.toFixed(2)),
@@ -386,9 +412,10 @@ export default function CarDetect() {
           action_required: (dmg.recommend ?? "repair").toLowerCase() as "repair" | "replace",
           cost: dmg.cost || 0,
         })),
-        total_cost: damageData.reduce((total, curr) => total + (curr.cost || 0), 0),
+        total_cost: uniqueDamages.reduce((total, curr) => total + (curr.cost || 0), 0),
       };
-
+      
+      console.log("Report Data:", reportData);
       // บันทึกรายงาน
       await axios.post('/api/saveDamageReport', reportData);
       alert('Report saved successfully.');
@@ -461,11 +488,24 @@ export default function CarDetect() {
 
           {/* Drop Zone */}
           {activeTab === "single" ? (
-            <div className="w-full h-[200px] bg-[#45287e42] rounded-lg flex flex-col justify-center items-center text-white border-2  border-[#5e17eb] hover:border-[#5e17eb7c]">
+            <div className="w-full h-[200px] bg-[#45287e42] rounded-lg flex flex-col justify-center items-center text-white border-2 border-[#5e17eb] hover:border-[#5e17eb7c]">
               <label className="cursor-pointer flex flex-col items-center">
-                <span className="text-2xl"></span>
-                {selectedFile ? selectedFile.name : "Single Car Damaged Image"}
-                <p className="text-sm">File should not exceed 5 MB</p>
+                <span className="text-2xl mb-2"></span>
+
+                {/* ✅ ถ้ามี preview image → แสดงรูปภาพ */}
+                {previewURL ? (
+                  <img
+                    src={previewURL}
+                    alt="Preview"
+                    className="max-h-[180px] max-w-full object-contain rounded transition duration-300"
+                  />
+                ) : (
+                  <>
+                    <span className="font-medium">Single Car Damaged Image</span>
+                    <p className="text-sm">File should not exceed 5 MB</p>
+                  </>
+                )}
+
                 <input
                   type="file"
                   accept="image/*"
@@ -477,13 +517,28 @@ export default function CarDetect() {
           ) : (
             <div className="grid grid-cols-2 gap-4">
               {selectedFileMultiple.map((file, index) => {
-                const position = positions[index]; // ประกาศและกำหนดค่า
+                const position = positions[index]; // เช่น "Front", "Back", "Left", "Right"
+                const previewURL = file instanceof File ? URL.createObjectURL(file) : "";
 
                 return (
-                  <div key={index} className="relative w-full h-[150px] bg-[#45287e42] rounded-lg  flex-col  text-white border-2  border-[#5e17eb] hover:border-[#5e17eb7c] flex items-center justify-center">
-                    <label className="cursor-pointer flex flex-col items-center">
-                      <span className="text-2xl"></span>
-                      <p className="text-sm text-gray-400">Upload Image: {position}</p>
+                  <div
+                    key={index}
+                    className="relative w-full h-[170px] bg-[#1f103f] rounded-lg border-2 border-[#5e17eb] hover:border-[#9c64f7] flex items-center justify-center overflow-hidden"
+                  >
+                    <label className="cursor-pointer w-full h-full flex flex-col items-center justify-center">
+                      {file && previewURL ? (
+                        <img
+                          src={previewURL}
+                          alt={`Preview ${index}`}
+                          className="w-full h-full object-contain rounded"
+                        />
+                      ) : (
+                        <>
+                          <span className="text-lg font-bold text-white">{position}</span>
+                          <p className="text-sm">File should not exceed 5 MB</p>
+                        </>
+                      )}
+
                       <input
                         type="file"
                         accept="image/*"
@@ -495,6 +550,7 @@ export default function CarDetect() {
                 );
               })}
             </div>
+
           )}
 
           {/* Calculate Button */}
@@ -504,7 +560,7 @@ export default function CarDetect() {
               disabled={loading}
               className="w-full bg-[#5e17eb] hover:bg-[#5e17eb6b] text-white py-2 px-4 rounded-lg font-semibold"
             >
-              {loading ? "Calculating..." : "Calculate"}
+              {loading ? "Processing..." : "Next"}
             </button>
           </div>
 
@@ -689,11 +745,12 @@ export default function CarDetect() {
                                 {/* Damage Types */}
                                 <td className="py-4 px-4">
                                   <div className="flex flex-wrap gap-2">
-                                    {damage.damages.map((d, i) => (
-                                      <span
-                                        key={i}
-                                        className="bg-[#2e2649] border-2 text-white border-[#5e17eb] text-xs px-2 py-1 rounded-full"
-                                      >
+                                    {Array.from(
+                                      new Map(
+                                        damage.damages.map((d) => [d.damage_name, d])
+                                      ).values()
+                                    ).map((d, i) => (
+                                      <span key={i} className="bg-[#2e2649] border-2 text-white border-[#5e17eb] text-xs px-2 py-1 rounded-full">
                                         {d.damage_name}
                                       </span>
                                     ))}
@@ -718,8 +775,8 @@ export default function CarDetect() {
                                 {/* Recommendation */}
                                 <td className="py-4 px-4">
                                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${damage.recommend === "REPLACE"
-                                      ? "bg-red-500/20 text-red-400"
-                                      : "bg-green-500/20 text-green-400"
+                                    ? "bg-red-500/20 text-red-400"
+                                    : "bg-green-500/20 text-green-400"
                                     }`}>
                                     {damage.recommend}
                                   </span>
@@ -762,7 +819,7 @@ export default function CarDetect() {
               {results.length > 0 && activeTab === "multiple" && (
                 <div>
 
-<div className="flex">
+                  <div className="flex">
                     <div className="w-full p-3 text-white text-sm">
                       <div className="p-3 bg-[#2a1b4d] rounded-lg border border-[#4a3a7d]">
                         <h3 className="text-lg text-center font-bold text-purple-100">Car Details</h3>
@@ -931,7 +988,7 @@ export default function CarDetect() {
                               <div className=" bg-[#4a3a7d] border-b border-[#4a3a7d]">
                                 <h4 className="font-semibold text-purple-100 flex items-center">
                                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round"  />
+                                    <path strokeLinecap="round" strokeLinejoin="round" />
                                   </svg>
                                   Original Image
                                 </h4>
@@ -1077,32 +1134,53 @@ export default function CarDetect() {
                 </div>
               )}
               <div className="mt-6 text-right font-bold text-white">
-                Overall Total Cost: {results.reduce((total, result, index) => {
-                  const damageData = result.results[0].result.detection_results.map((damage) => {
-                    const pricing = pricingData.find((p) => p.name.trim() === damage.part_name.trim());
-                    const isReplace = Math.max(...(damage.damages ?? []).map((d) => d.overlap_ratio), 0) * 100 > 50;
+  Overall Total Cost: {
+    Object.values(
+      results.flatMap(r =>
+        r.results[0].result.detection_results.map((damage) => {
+          const partName = damage.part_name.trim();
+          const overlap = Math.max(...(damage.damages ?? []).map(d => d.overlap_ratio), 0) * 100;
+          const isReplace = overlap > 50;
 
-                    return isReplace
-                      ? parseFloat(
-                        typeof pricing?.price === 'number'
-                          ? pricing.price.toString()
-                          : pricing?.price.$numberDecimal || '0'
-                      )
-                      : parseFloat(
-                        typeof pricing?.repair === 'number'
-                          ? pricing.repair.toString()
-                          : pricing?.repair.$numberDecimal || '0'
-                      );
-                  });
+          const pricing = pricingData.find((p) => p.name.trim() === partName);
 
-                  return total + damageData.reduce((sum, cost) => sum + cost, 0);
-                }, 0).toFixed(0)} ฿
-              </div>
+          const cost = isReplace
+            ? parseFloat(typeof pricing?.price === "number"
+              ? pricing.price.toString()
+              : pricing?.price?.$numberDecimal || '0')
+            : parseFloat(typeof pricing?.repair === "number"
+              ? pricing.repair.toString()
+              : pricing?.repair?.$numberDecimal || '0');
+
+          return {
+            part_name: partName,
+            overlap_ratio: overlap,
+            cost,
+          };
+        })
+      ).reduce((acc, curr) => {
+        // รวมเฉพาะ part_name ไม่ซ้ำ โดยใช้ค่า overlap ที่มากสุด
+        const exist = acc[curr.part_name];
+        if (!exist || curr.overlap_ratio > exist.overlap_ratio) {
+          acc[curr.part_name] = curr;
+        }
+        return acc;
+      }, {} as Record<string, { part_name: string; overlap_ratio: number; cost: number }>)
+    )
+    .reduce((total, curr) => total + (curr.cost || 0), 0)
+    .toLocaleString('en-US', {
+      style: 'currency',
+      currency: 'THB',
+      minimumFractionDigits: 0
+    })
+  }
+</div>
+
               <button
                 className="w-full mt-4 bg-[#5e17eb] text-white py-2 px-4 rounded-lg"
                 onClick={handleSaveReport}
               >
-                Save Report
+                Create Report
               </button>
             </div>
 

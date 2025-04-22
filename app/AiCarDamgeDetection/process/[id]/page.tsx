@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Navbar from '../../../components/Navbar';
+import NotificationBar from '../../../components/NotificationBar';
 import Image from "next/image";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faDownload } from "@fortawesome/free-solid-svg-icons";
@@ -34,11 +35,11 @@ interface ReportProcess {
     processedImages: string[];
 }
 
-const StatusIndicator = ({ 
-    status, 
+const StatusIndicator = ({
+    status,
     currentStatus,
     icon,
-    label 
+    label
 }: {
     status: string;
     currentStatus: string;
@@ -49,7 +50,7 @@ const StatusIndicator = ({
     const isPending = status === "pending";
     const isApproved = status === "approved";
     const isCompleted = status === "completed";
-    
+
     const isPast = (
         (currentStatus === "approved" && ["completed", "pending"].includes(status)) ||
         (currentStatus === "pending" && status === "completed")
@@ -107,9 +108,8 @@ const StatusIndicator = ({
 
 const ProcessConnector = ({ active }: { active: boolean }) => (
     <div className="flex-1 h-1 mx-2 mt-10">
-        <div className={`h-full rounded-full ${
-            active ? "bg-white" : "bg-gray-500"
-        }`}></div>
+        <div className={`h-full rounded-full ${active ? "bg-white" : "bg-gray-500"
+            }`}></div>
     </div>
 );
 
@@ -178,43 +178,97 @@ export default function ReportProcessPage() {
         doc.setFont("THSarabunNew");
     
         doc.setFontSize(18);
-        doc.text("Insurance Company Limited", 105, 20, { align: "center" });
+        doc.text("Insurance Company", 105, 20, { align: "center" });
     
         doc.setFontSize(14);
-        doc.text(`Car Brand: ${report.car_info.brand}`, 14, 35);
-        doc.text(`Model: ${report.car_info.model}`, 14, 43);
-        doc.text(`Year: ${report.car_info.year}`, 14, 51);
-        doc.text(`Claim ID: ${report.report_id}`, 14, 59);
-        doc.text(`License Plate: ${customerInsurances.license_plate}`, 14, 67);
-        doc.text(`Policy Number: ${customerInsurances.policy_number}`, 14, 75);
-        doc.text(`Policy Start Date: ${new Date(customerInsurances.policy_start_date).toLocaleDateString()}`, 14, 83);
-        doc.text(`Policy End Date: ${new Date(customerInsurances.policy_end_date).toLocaleDateString()}`, 14, 91);
-        doc.text(`Policy Holder: ${users.firstName} ${users.lastName}`, 14, 99);
-        doc.text(`Claim Date: ${new Date(report.createdAt).toLocaleDateString()}`, 14, 107);
-        doc.text(`Incident Date: ${new Date(report.updatedAt).toLocaleDateString()}`, 14, 115);
+        doc.text("Car Detail", 105, 30, { align: "center" });
+    
+        doc.text(`Car Brand: ${report.car_info.brand}`, 14, 40);
+        doc.text(`Model: ${report.car_info.model}`, 14, 48);
+        doc.text(`Year: ${report.car_info.year}`, 150, 40);
+        doc.text(`License Plate: ${customerInsurances.license_plate}`, 150, 48);
+    
+        // 🟣 เปลี่ยนเส้นเป็น #bfc3c8 และบางลง
+        doc.setDrawColor(191, 195, 200);
+        doc.setLineWidth(0.2);
+        doc.line(14, 55, 195, 55);
+    
+        doc.text(`Claim ID: ${report.report_id}`, 14, 65);
+        doc.text(`Policy Number: ${customerInsurances.policy_number}`, 14, 73);
+        doc.text(`Policy Holder: ${users.firstName} ${users.lastName}`, 150, 73);
+        doc.text(`Claim Date: ${new Date(report.createdAt).toLocaleDateString()}`, 14, 81);
+        doc.text(`Incident Date: ${new Date(report.updatedAt).toLocaleDateString()}`, 14, 89);
+    
+        doc.line(14, 95, 195, 95); // บางเช่นกัน
+    
+        // ✅ จัดการข้อมูล Damage และลบ type ซ้ำ
+        const groupedData = report.damages.reduce((acc, cur) => {
+            const part = cur.damage_part.trim();
+            if (!acc[part]) {
+                acc[part] = {
+                    damageTypes: new Set<string>(),
+                    totalArea: 0,
+                    totalConfidence: 0,
+                    totalCost: 0,
+                    actions: new Set<string>(),
+                    count: 0
+                };
+            }
+    
+            // 🧠 แยก string ที่มี comma ออกเป็นหลาย type และ trim
+            cur.detected_type.split(',').map(s => s.trim().toUpperCase()).forEach(type => {
+                acc[part].damageTypes.add(type);
+            });
+    
+            acc[part].actions.add(cur.action_required.trim().toUpperCase());
+            acc[part].totalArea += cur.damage_area;
+            acc[part].totalConfidence += cur.confidence;
+            acc[part].totalCost += cur.cost;
+            acc[part].count += 1;
+    
+            return acc;
+        }, {} as Record<string, {
+            damageTypes: Set<string>,
+            totalArea: number,
+            totalConfidence: number,
+            totalCost: number,
+            actions: Set<string>,
+            count: number
+        }>);
     
         autoTable(doc, {
-            startY: 125,
-            head: [["Damaged Part", "Type", "Damage Area (%)", "Confidence (%)", "Action Required", "Cost (THB)"]],
-            body: report.damages.map(damage => [
-                damage.damage_part,
-                damage.detected_type,
-                damage.damage_area.toFixed(2),
-                damage.confidence.toFixed(2),
-                damage.action_required === 'repair' ? 'Repair' : 'Replace',
-                damage.cost.toFixed(2),
+            startY: 100,
+            head: [["Part", "Damage Type", "Area (%)", "Confidence (%)", "Action", "Cost (THB)"]],
+            body: Object.entries(groupedData).map(([part, values]) => [
+                part,
+                Array.from(values.damageTypes).join(", "),
+                values.totalArea.toFixed(2),
+                (values.totalConfidence / values.count).toFixed(2),
+                Array.from(values.actions).join(", "),
+                `$${values.totalCost.toFixed(2)}`
             ]),
-            styles: { font: "THSarabunNew", fontSize: 14 },
-            headStyles: { fillColor: [220, 220, 220], textColor: [0, 0, 0] },
+            styles: { font: "THSarabunNew", fontSize: 12 },
+            headStyles: { fillColor: [115, 82, 199], textColor: [255, 255, 255] },
+            columnStyles: { 5: { halign: 'right' } }
         });
     
-        const finalY = (doc as any).previousAutoTable.finalY + 10;
+        const finalY = (doc as any).lastAutoTable.finalY + 10;
+        doc.setFontSize(14);
         doc.text(`Total Damage Cost: ${report.total_cost.toFixed(2)} THB`, 14, finalY);
-        doc.text("Approver Signature: ____________________________", 14, finalY + 20);
-        doc.text("Customer Signature: ____________________________", 120, finalY + 20);
     
+        // 🖋️ เส้นเซ็นชื่อบางลง และจัดตำแหน่ง
+        doc.text("Approver Signature", 30, finalY + 15);
+        doc.text("Customer Signature", 140, finalY + 15);
+
+
+        
+        doc.setDrawColor(0); // black
+        doc.setLineWidth(0.3); // thin
+        doc.line(20, finalY + 25, 80, finalY + 25);
+        doc.line(130, finalY + 25, 190, finalY + 25);
+    
+        // ✅ หน้าใหม่ใส่รูป
         const allImages = [...(report.images || []), ...(report.processedImages || [])].slice(0, 8);
-    
         if (allImages.length > 0) {
             doc.addPage();
             doc.setFontSize(16);
@@ -227,18 +281,33 @@ export default function ReportProcessPage() {
     
             for (let i = 0; i < allImages.length; i++) {
                 const imageUrl = allImages[i]?.startsWith("http") ? allImages[i] : `${minioBaseUrl}/${allImages[i]}`;
-    
                 const xPos = col === 0 ? 14 : 110;
-                doc.addImage(imageUrl, "JPEG", xPos, yOffset, imageWidth, imageHeight);
     
-                col = (col + 1) % 2;
-                if (col === 0) yOffset += imageHeight + 10;
+                try {
+                    // 📸 โหลดและแสดงภาพ
+                    const img = await fetch(imageUrl).then(r => r.blob());
+                    const base64 = await new Promise<string>((resolve) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result as string);
+                        reader.readAsDataURL(img);
+                    });
+    
+                    doc.addImage(base64, "JPEG", xPos, yOffset, imageWidth, imageHeight);
+    
+                    col = (col + 1) % 2;
+                    if (col === 0) yOffset += imageHeight + 10;
+                } catch (err) {
+                    console.error("Error loading image:", imageUrl, err);
+                }
             }
         }
     
         doc.save(`Insurance_Claim_${report.report_id}.pdf`);
     };
     
+    
+    
+
     const toggleDropdown = () => {
         setIsOpen(!isOpen);
     };
@@ -246,6 +315,7 @@ export default function ReportProcessPage() {
     return (
         <div>
             <Navbar />
+
             <div className="container mx-auto p-6">
                 <h1 className="text-3xl font-bold mb-6 text-white">Claim Status Report</h1>
 
@@ -254,7 +324,7 @@ export default function ReportProcessPage() {
                         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
                     </div>
                 )}
-                
+
                 {error && (
                     <div className="bg-red-900/50 border border-red-500 text-red-300 px-4 py-3 rounded-lg mb-6">
                         {error}
@@ -262,51 +332,137 @@ export default function ReportProcessPage() {
                 )}
 
                 {report && (
-                    <div className="bg-[#2e264c] p-6 rounded-2xl shadow-xl text-white">
-                        {/* Process Status Indicator */}
-                        <div className="flex items-center justify-between mb-8 px-4">
-                            <StatusIndicator 
-                                status="completed" 
-                                currentStatus={report.status}
-                                icon="/img/insurance-documentation.png"
-                                label="Report Created"
-                            />
-                            <ProcessConnector active={["pending", "approved"].includes(report.status)} />
-                            
-                            <StatusIndicator 
-                                status="pending" 
-                                currentStatus={report.status}
-                                icon="/img/pending.png"
-                                label="Pending Approval"
-                            />
-                            <ProcessConnector active={report.status === "approved"} />
-                            
-                            <StatusIndicator 
-                                status="approved" 
-                                currentStatus={report.status}
-                                icon="/img/succ.png"
-                                label="Approved"
-                            />
-                        </div>
+                    <>
+                        
+                        <div className="bg-[#2e264c] p-6 rounded-2xl shadow-xl text-white">
 
-                        {/* Timeline Details */}
-                        <div className="relative">
-                            {/* Purple timeline line */}
-                            <div className="absolute left-5 top-0 bottom-0 w-2 bg-purple-500 "></div>
-                            
-                            {/* Report Created Step */}
-                            <div className="relative pl-12 pb-8">
-                                <div className={`absolute left-6 top-0 w-6 h-6 rounded-full -translate-x-1/2 ${
-                                    report.status === "completed" ? "bg-orange-500" : "bg-gray-500"
-                                }`}></div>
-                                
-                                <div 
-                                    className="flex items-center justify-between cursor-pointer bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition"
-                                    onClick={toggleDropdown}
-                                >
-                                    <div>
+                            {/* Process Status Indicator */}
+                            <div className="flex items-center justify-between mb-8 px-4">
+                                <StatusIndicator
+                                    status="completed"
+                                    currentStatus={report.status}
+                                    icon="/img/insurance-documentation.png"
+                                    label="Report Created"
+                                />
+                                <ProcessConnector active={["pending", "approved"].includes(report.status)} />
+
+                                <StatusIndicator
+                                    status="pending"
+                                    currentStatus={report.status}
+                                    icon="/img/pending.png"
+                                    label="Pending Approval"
+                                />
+                                <ProcessConnector active={report.status === "approved"} />
+
+                                <StatusIndicator
+                                    status="approved"
+                                    currentStatus={report.status}
+                                    icon="/img/succ.png"
+                                    label="Approved"
+                                />
+                            </div>
+
+                            {/* Timeline Details */}
+                            <div className="relative">
+                                {/* Purple timeline line */}
+                                <div className="absolute left-5 top-0 bottom-0 w-2 bg-purple-500 "></div>
+
+                                {/* Report Created Step */}
+                                <div className="relative pl-12 pb-8">
+                                    <div className={`absolute left-6 top-0 w-6 h-6 rounded-full -translate-x-1/2 ${report.status === "completed" ? "bg-orange-500" : "bg-gray-500"
+                                        }`}></div>
+
+                                    <div
+                                        className="flex items-center justify-between cursor-pointer bg-gray-800 p-4 rounded-lg hover:bg-gray-700 transition"
+                                        onClick={toggleDropdown}
+                                    >
+                                        <div>
+                                            <p className="text-sm text-gray-300">
+                                                {new Date(report.createdAt).toLocaleString("en-US", {
+                                                    day: 'numeric',
+                                                    month: 'short',
+                                                    year: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                })}
+                                            </p>
+                                            <p className="text-white font-bold text-lg">Report Created</p>
+                                        </div>
+                                        <FontAwesomeIcon
+                                            icon={isOpen ? faChevronUp : faChevronDown}
+                                            className="text-white text-lg"
+                                        />
+                                    </div>
+
+                                    {isOpen && (
+                                        <div className="mt-3 bg-[#3a2e6d] text-white p-5 rounded-lg shadow-lg">
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                                <div>
+                                                    <h3 className="text-lg font-semibold mb-2 text-purple-300">Vehicle Information</h3>
+                                                    <p><span className="font-medium">Brand:</span> {report.car_info.brand}</p>
+                                                    <p><span className="font-medium">Model:</span> {report.car_info.model}</p>
+                                                    <p><span className="font-medium">Year:</span> {report.car_info.year}</p>
+                                                </div>
+                                                <div>
+                                                    <h3 className="text-lg font-semibold mb-2 text-purple-300">Claim Information</h3>
+                                                    <p><span className="font-medium">Report ID:</span> {report.report_id}</p>
+                                                    <p><span className="font-medium">Created At:</span> {new Date(report.createdAt).toLocaleString()}</p>
+                                                </div>
+                                            </div>
+
+                                            <h3 className="text-lg font-semibold mt-4 mb-3 text-purple-300">Damage Images</h3>
+                                            {report.images?.length > 0 || report.processedImages?.length > 0 ? (
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                    {report.images.map((image, index) => {
+                                                        const imageUrl = image.startsWith("http") ? image : `${minioBaseUrl}/${image}`;
+                                                        const processedImage = report.processedImages?.[index];
+                                                        const processedImageUrl = processedImage
+                                                            ? (processedImage.startsWith("http")
+                                                                ? processedImage
+                                                                : `${minioBaseUrl}/${processedImage}`)
+                                                            : null;
+
+                                                        return (
+                                                            <div key={index} className="space-y-2">
+                                                                <div className="bg-gray-900 p-3 rounded-lg">
+                                                                    <Image
+                                                                        src={imageUrl}
+                                                                        alt={`Original ${index + 1}`}
+                                                                        width={400}
+                                                                        height={250}
+                                                                        className="rounded-lg w-full h-auto"
+                                                                    />
+                                                                </div>
+                                                                {processedImageUrl && (
+                                                                    <div className="bg-gray-900 p-3 rounded-lg">
+                                                                        <p className="text-sm text-green-400 mb-2">Damage Assessment {index + 1}</p>
+                                                                        <Image
+                                                                            src={processedImageUrl}
+                                                                            alt={`Processed ${index + 1}`}
+                                                                            width={400}
+                                                                            height={250}
+                                                                            className="rounded-lg w-full h-auto"
+                                                                        />
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            ) : (
+                                                <p className="text-gray-400 italic">No images uploaded</p>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Pending Approval Step */}
+                                <div className="relative pl-12 pb-8">
+                                    <div className={`absolute left-6 top-0 w-6 h-6 rounded-full -translate-x-1/2 ${["pending", "approved"].includes(report.status) ? "bg-yellow-500" : "bg-gray-500"
+                                        }`}></div>
+                                    <div className="bg-gray-800 p-4 rounded-lg">
                                         <p className="text-sm text-gray-300">
-                                            {new Date(report.createdAt).toLocaleString("en-US", {
+                                            {new Date(report.updatedAt).toLocaleString("en-US", {
                                                 day: 'numeric',
                                                 month: 'short',
                                                 year: 'numeric',
@@ -314,134 +470,48 @@ export default function ReportProcessPage() {
                                                 minute: '2-digit'
                                             })}
                                         </p>
-                                        <p className="text-white font-bold text-lg">Report Created</p>
+                                        <p className={`text-lg font-bold ${report.status === "pending" ? "text-yellow-400" : "text-gray-400"
+                                            }`}>
+                                            {report.status === "pending" ? "Waiting for Approval" : "Approval Request Sent"}
+                                        </p>
+                                        {report.status === "pending" && (
+                                            <p className="text-gray-400 mt-1">The system is processing and verifying the damage</p>
+                                        )}
                                     </div>
-                                    <FontAwesomeIcon 
-                                        icon={isOpen ? faChevronUp : faChevronDown} 
-                                        className="text-white text-lg" 
-                                    />
                                 </div>
-                                
-                                {isOpen && (
-                                    <div className="mt-3 bg-[#3a2e6d] text-white p-5 rounded-lg shadow-lg">
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                            <div>
-                                                <h3 className="text-lg font-semibold mb-2 text-purple-300">Vehicle Information</h3>
-                                                <p><span className="font-medium">Brand:</span> {report.car_info.brand}</p>
-                                                <p><span className="font-medium">Model:</span> {report.car_info.model}</p>
-                                                <p><span className="font-medium">Year:</span> {report.car_info.year}</p>
-                                            </div>
-                                            <div>
-                                                <h3 className="text-lg font-semibold mb-2 text-purple-300">Claim Information</h3>
-                                                <p><span className="font-medium">Report ID:</span> {report.report_id}</p>
-                                                <p><span className="font-medium">Created At:</span> {new Date(report.createdAt).toLocaleString()}</p>
+
+                                {/* Approved Step */}
+                                {report.status === "approved" && (
+                                    <div className="relative pl-12">
+                                        <div className="absolute left-6 top-0 w-6 h-6 rounded-full -translate-x-1/2 bg-green-500"></div>
+                                        <div className="bg-gray-800 p-4 rounded-lg">
+                                            <p className="text-sm text-gray-300">
+                                                {report.completedAt ? new Date(report.completedAt).toLocaleString("en-US", {
+                                                    day: 'numeric',
+                                                    month: 'short',
+                                                    year: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit'
+                                                }) : "In Progress"}
+                                            </p>
+                                            <p className="text-green-400 text-lg font-bold">Approved</p>
+                                            <p className="text-gray-400 mt-1">This report has been approved</p>
+
+                                            <div className="mt-4">
+                                                <button
+                                                    onClick={generatePDF}
+                                                    className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-full transition"
+                                                >
+                                                    <FontAwesomeIcon icon={faDownload} />
+                                                    Download PDF Document
+                                                </button>
                                             </div>
                                         </div>
-
-                                        <h3 className="text-lg font-semibold mt-4 mb-3 text-purple-300">Damage Images</h3>
-                                        {report.images?.length > 0 || report.processedImages?.length > 0 ? (
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                                {report.images.map((image, index) => {
-                                                    const imageUrl = image.startsWith("http") ? image : `${minioBaseUrl}/${image}`;
-                                                    const processedImage = report.processedImages?.[index];
-                                                    const processedImageUrl = processedImage 
-                                                        ? (processedImage.startsWith("http") 
-                                                            ? processedImage 
-                                                            : `${minioBaseUrl}/${processedImage}`)
-                                                        : null;
-
-                                                    return (
-                                                        <div key={index} className="space-y-2">
-                                                            <div className="bg-gray-900 p-3 rounded-lg">
-                                                                <p className="text-sm text-gray-400 mb-2">Original Image {index + 1}</p>
-                                                                <Image
-                                                                    src={imageUrl}
-                                                                    alt={`Original ${index + 1}`}
-                                                                    width={400}
-                                                                    height={250}
-                                                                    className="rounded-lg w-full h-auto"
-                                                                />
-                                                            </div>
-                                                            {processedImageUrl && (
-                                                                <div className="bg-gray-900 p-3 rounded-lg">
-                                                                    <p className="text-sm text-green-400 mb-2">Damage Assessment {index + 1}</p>
-                                                                    <Image
-                                                                        src={processedImageUrl}
-                                                                        alt={`Processed ${index + 1}`}
-                                                                        width={400}
-                                                                        height={250}
-                                                                        className="rounded-lg w-full h-auto"
-                                                                    />
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        ) : (
-                                            <p className="text-gray-400 italic">No images uploaded</p>
-                                        )}
                                     </div>
                                 )}
                             </div>
-
-                            {/* Pending Approval Step */}
-                            <div className="relative pl-12 pb-8">
-                                <div className={`absolute left-6 top-0 w-6 h-6 rounded-full -translate-x-1/2 ${
-                                    ["pending", "approved"].includes(report.status) ? "bg-yellow-500" : "bg-gray-500"
-                                }`}></div>
-                                <div className="bg-gray-800 p-4 rounded-lg">
-                                    <p className="text-sm text-gray-300">
-                                        {new Date(report.updatedAt).toLocaleString("en-US", {
-                                            day: 'numeric',
-                                            month: 'short',
-                                            year: 'numeric',
-                                            hour: '2-digit',
-                                            minute: '2-digit'
-                                        })}
-                                    </p>
-                                    <p className={`text-lg font-bold ${
-                                        report.status === "pending" ? "text-yellow-400" : "text-gray-400"
-                                    }`}>
-                                        {report.status === "pending" ? "Waiting for Approval" : "Approval Request Sent"}
-                                    </p>
-                                    {report.status === "pending" && (
-                                        <p className="text-gray-400 mt-1">The system is processing and verifying the damage</p>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Approved Step */}
-                            {report.status === "approved" && (
-                                <div className="relative pl-12">
-                                    <div className="absolute left-6 top-0 w-6 h-6 rounded-full -translate-x-1/2 bg-green-500"></div>
-                                    <div className="bg-gray-800 p-4 rounded-lg">
-                                        <p className="text-sm text-gray-300">
-                                            {report.completedAt ? new Date(report.completedAt).toLocaleString("en-US", {
-                                                day: 'numeric',
-                                                month: 'short',
-                                                year: 'numeric',
-                                                hour: '2-digit',
-                                                minute: '2-digit'
-                                            }) : "In Progress"}
-                                        </p>
-                                        <p className="text-green-400 text-lg font-bold">Approved</p>
-                                        <p className="text-gray-400 mt-1">This report has been approved</p>
-                                        
-                                        <div className="mt-4">
-                                            <button 
-                                                onClick={generatePDF}
-                                                className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-medium py-2 px-4 rounded-full transition"
-                                            >
-                                                <FontAwesomeIcon icon={faDownload} />
-                                                Download PDF Document
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
                         </div>
-                    </div>
+                    </>
                 )}
             </div>
         </div>

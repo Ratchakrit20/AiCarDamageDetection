@@ -3,19 +3,26 @@
 import React, { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import Navbar from '../components/Navbar';
+import Navbar from '../../components/Navbar';
 
 
 interface DamageReport {
     _id: string;
     report_id: string;
-    user_id: { firstName: string; lastName: string } | null;
+    user_id: { _id: string; firstName: string; lastName: string } | null; // ✅ เพิ่ม _id
     car_info: { brand: string; model: string; year: string };
     images: string[];
-    damages: { damage_part: string; detected_type: string; confidence: number; action_required: string; cost: number }[];
+    damages: {
+      damage_part: string;
+      detected_type: string;
+      confidence: number;
+      action_required: string;
+      cost: number;
+    }[];
     total_cost: number;
     status: string;
-}
+  }
+  
 
 export default function AdminPage() {
     const { data: session, status } = useSession();
@@ -41,8 +48,14 @@ export default function AdminPage() {
                 const transformedData = data.data.map((report: Record<string, any>) => ({
                     _id: report._id || "",
                     report_id: report.report_id || "",
-                    user_id: report.user_id ? { firstName: report.user_id.firstName, lastName: report.user_id.lastName } : null,
-                    car_info: report.car_info || { brand: "", model: "", year: "" },
+                    user_id: report.user_id
+                    ? {
+                        _id: report.user_id._id, 
+                        firstName: report.user_id.firstName,
+                        lastName: report.user_id.lastName,
+                      }
+                    : null,
+                                      car_info: report.car_info || { brand: "", model: "", year: "" },
                     images: report.images || [],
                     damages: report.damages || [],
                     total_cost: report.total_cost || 0,
@@ -57,7 +70,7 @@ export default function AdminPage() {
 
     useEffect(() => {
         fetchReports();
-    
+
     }, [filter,]);
 
     const updateStatus = async (id: string, status: string, reason?: string) => {
@@ -74,14 +87,24 @@ export default function AdminPage() {
         }
     };
 
-    const handleViewImages = (images: string[]) => {
-        if (images.length === 0) {
-            alert("No images available");
-            return;
+    const handleViewImages = async (images: string[], userId: string) => {
+        try {
+            const res = await fetch(`/api/admin/getRegisteredImage?userId=${userId}`);
+            const data = await res.json();
+            const registeredImage = data?.registered_car_image || null;
+
+            if (!images.length && !registeredImage) {
+                alert("No images available");
+                return;
+            }
+
+            setSelectedImages([...images, ...(registeredImage ? [registeredImage] : [])]);
+            setIsImageModalOpen(true);
+        } catch (error) {
+            console.error("❌ Failed to fetch registered car image:", error);
         }
-        setSelectedImages(images);
-        setIsImageModalOpen(true);
     };
+
 
     const closeImageModal = () => {
         setIsImageModalOpen(false);
@@ -148,25 +171,63 @@ export default function AdminPage() {
                                         </table>
                                     </td>
                                     <td className="p-3">
-                                        <button onClick={() => handleViewImages(report.images)} className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-full">View</button>
-                                    </td>
+  <div className="flex gap-2">
+    <button
+      onClick={() => handleViewImages(report.images, report.user_id!._id)}
+      className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-full"
+    >
+      View
+    </button>
+  </div>
+</td>
+
                                     <td className="p-3 font-semibold">฿{report.total_cost}</td>
                                     <td className="p-3 space-x-2">
                                         {filter === "pending" && (
                                             <>
-                                                <button className="bg-green-600 hover:bg-green-700 px-3 py-1 rounded-md" onClick={() => updateStatus(report._id, "approved")}>Approve</button>
-                                                <button className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md" onClick={() => {
-                                                    const reason = prompt("Reason for rejection?");
-                                                    if (reason) updateStatus(report._id, "rejected", reason);
-                                                }}>Reject</button>
-                                          
+                                                <button
+                                                    className="bg-green-600 hover:bg-green-700 px-3 py-1 rounded-md"
+                                                    onClick={async () => {
+                                                        await updateStatus(report._id, "approved"); // อัปเดตสถานะจริง
+                                                        await fetch("/api/admin/updateNotiStatus", {
+                                                            method: "POST",
+                                                            headers: { "Content-Type": "application/json" },
+                                                            body: JSON.stringify({ id: report._id, status: "approved" }),
+                                                        });
+                                                    }}
+                                                >
+                                                    Approve
+                                                </button>
 
+                                                <button
+                                                    className="bg-red-600 hover:bg-red-700 px-3 py-1 rounded-md"
+                                                    onClick={async () => {
+                                                        const reason = prompt("Reason for rejection?");
+                                                        if (reason) {
+                                                            await updateStatus(report._id, "rejected", reason);
+                                                            await fetch("/api/admin/updateNotiStatus", {
+                                                                method: "POST",
+                                                                headers: { "Content-Type": "application/json" },
+                                                                body: JSON.stringify({ id: report._id, status: "rejected", reason }),
+                                                            });
+                                                        }
+                                                    }}
+                                                >
+                                                    Reject
+                                                </button>
                                             </>
                                         )}
+
                                         {filter !== "pending" && (
-                                            <button className="bg-yellow-500 hover:bg-yellow-600 px-3 py-1 rounded-full" onClick={() => updateStatus(report._id, "pending")}>Reset</button>
+                                            <button
+                                                className="bg-yellow-500 hover:bg-yellow-600 px-3 py-1 rounded-full"
+                                                onClick={() => updateStatus(report._id, "pending")}
+                                            >
+                                                Reset
+                                            </button>
                                         )}
                                     </td>
+
                                 </tr>
                             ))}
                         </tbody>

@@ -1,29 +1,38 @@
-import { NextResponse } from "next/server";
+// app/api/insurance/request/route.ts
+import { NextRequest, NextResponse } from "next/server";
 import { connectMongoDB } from "@/lib/mongodb";
+import InsuranceRequest from "@/models/InsuranceRequest";
 import CustomerInsurance from "@/models/CustomerInsurance";
 
-export async function POST(req: Request) {
-    await connectMongoDB();
-    const { insuranceId, insurance } = await req.json();
+export async function POST(req: NextRequest) {
+  await connectMongoDB();
 
-    try {
-        const updatedInsurance = await CustomerInsurance.findByIdAndUpdate(insuranceId, insurance, {
-            new: true,
-            runValidators: true,
-        });
+  const body = await req.json();
+  const { user_id, policy_number, license_plate } = body;
 
-        if (!updatedInsurance) {
-            return NextResponse.json({ message: "❌ Insurance not found" }, { status: 404 });
-        }
+  if (!user_id || !policy_number || !license_plate) {
+    return NextResponse.json({ message: "❌ Missing required fields" }, { status: 400 });
+  }
 
-        return NextResponse.json({ message: "✅ Insurance updated successfully", data: updatedInsurance }, { status: 200 });
+  const match = await CustomerInsurance.findOne({
+    policy_number,
+    license_plate,
+  });
 
-    } catch (error: unknown) {
-        console.error("❌ Update Insurance Error:", error);
+  const match_found = !!match;
 
-        // ✅ แก้ไข TypeScript Error โดยใช้ instanceof Error
-        const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+  const existing = await InsuranceRequest.findOne({ user_id });
+  if (existing) {
+    return NextResponse.json({ message: "❌ You already submitted a request." }, { status: 400 });
+  }
 
-        return NextResponse.json({ message: "❌ Failed to update insurance", error: errorMessage }, { status: 500 });
-    }
+  const newRequest = await InsuranceRequest.create({
+    user_id,
+    policy_number,
+    license_plate,
+    match_found,
+    status: "pending",
+  });
+
+  return NextResponse.json({ message: "✅ Request submitted", data: newRequest });
 }

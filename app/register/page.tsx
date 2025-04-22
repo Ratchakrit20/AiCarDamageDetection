@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import Navbar from '../components/Navbar';
+import { useRouter } from "next/navigation";
 
 function RegisterPage() {
 
@@ -13,11 +14,11 @@ function RegisterPage() {
     const [confirmPassword, setConfirmPassword] = useState("");
     const [error, setError] = useState("");
     const [success, setSuccess] = useState("");
-
+    const router = useRouter();
 
     const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
-        if (password != confirmPassword) {
+        if (password !== confirmPassword) {
             setError("Password do not match!");
             return;
         }
@@ -25,51 +26,45 @@ function RegisterPage() {
             setError("Please complete all input!");
             return;
         }
-
+    
         try {
-            const resCheckUser = await fetch("http://localhost:3000/api/checkUser", {
+            const resCheckUser = await fetch("/api/checkUser", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ username, email })
             });
             const { existingEmail, existingUsername } = await resCheckUser.json();
-
+    
             if (existingEmail) {
                 setError("Email already exists!");
                 return;
             }
-
             if (existingUsername) {
                 setError("Username already exists!");
                 return;
             }
-            const res = await fetch("http://localhost:3000/api/register", {
+    
+            const res = await fetch("/api/register", {
                 method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    firstName, lastName, email, username, password
-                })
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ firstName, lastName, email, username, password })
             });
+    
             if (res.ok) {
-                const form = e.target as HTMLFormElement;;
                 setError("");
-                setSuccess("User registration successfully")
-                form.reset();
-
+                setSuccess("User registration successful");
+    
+                setTimeout(() => {
+                    router.push("/login");
+                }, 1000); // ✅ delay เพื่อให้ผู้ใช้เห็นข้อความ success
             } else {
-
-                console.log("User registration fialed.")
+                console.log("User registration failed.");
             }
-
+    
         } catch (error) {
             console.log("Error during registration", error);
         }
-
-    }
+    };
 
     return (
 

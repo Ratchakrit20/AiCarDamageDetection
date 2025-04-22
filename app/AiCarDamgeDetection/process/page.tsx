@@ -64,7 +64,7 @@ export default function ProcessPage() {
             <Navbar />
             <div className="container mx-auto px-4 py-10">
                 <div className="flex justify-between items-center mb-6 gap-4 flex-wrap">
-                    <h1 className="text-4xl font-mono font-bold text-white">Claim Documents</h1>
+                    <h1 className="text-4xl  font-bold text-white">Claim Documents</h1>
                     <div className="flex items-center gap-4">
                        
 
