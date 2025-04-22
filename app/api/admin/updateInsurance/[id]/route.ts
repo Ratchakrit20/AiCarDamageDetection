@@ -3,9 +3,10 @@ import { connectMongoDB } from "@/lib/mongodb";
 import CustomerInsurance from "@/models/CustomerInsurance";
 import mongoose from "mongoose";
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   try {
     await connectMongoDB();
+    const params = await props.params;
     const insuranceId = params.id;
     const body = await req.json();
 
