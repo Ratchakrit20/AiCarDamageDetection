@@ -72,10 +72,12 @@ export default function AdminPage() {
         fetchReports();
 
     }, [filter,]);
-
+    
     const updateStatus = async (id: string, status: string, reason?: string) => {
         try {
             const res = await fetch("/api/admin/updateStatus", {
+                
+
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ id, status, reason }),

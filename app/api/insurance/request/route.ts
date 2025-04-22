@@ -39,8 +39,12 @@ export async function POST(req: NextRequest) {
     await InsuranceRequest.create({
       policy_number,
       user_id,
+      firstName,
+      lastName,
       status: "pending",
     });
+    
+    
 
     return NextResponse.json({ message: "ส่งคำขอยืนยันแล้ว กรุณารอการอนุมัติ" });
   } catch (error) {
