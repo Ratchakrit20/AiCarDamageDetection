@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ data: insurance });
   } catch (err: any) {
-    console.error("❌ Failed to get insurance:", err);
+    console.error("Failed to get insurance:");
     return NextResponse.json({ message: "Server error", error: err.message }, { status: 500 });
   }
 }

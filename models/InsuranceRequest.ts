@@ -7,4 +7,4 @@ const InsuranceRequestSchema = new Schema({
   status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
 });
 
-export default mongoose.models.InsuranceRequest  || model("InsuranceRequest ", InsuranceRequestSchema);
+export default mongoose.models.InsuranceRequest  || model("InsuranceRequest", InsuranceRequestSchema);

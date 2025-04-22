@@ -2,6 +2,7 @@
 import { useState } from "react";
 import axios from "axios";
 import { useSession } from "next-auth/react";
+import Navbar from "../../components/Navbar";
 
 export default function RegisterOwnershipPage() {
   const { data: session } = useSession();
@@ -15,18 +16,20 @@ export default function RegisterOwnershipPage() {
     try {
       const res = await axios.post<{ message: string }>("/api/insurance/request", {
         policy_number: policyNumber,
-        owner_firstname: firstName,
-        owner_lastname: lastName,
+        firstName,
+        lastName,
         user_id: session?.user?.id,
       });
       setStatus(res.data.message);
-     
     } catch (err: any) {
       setStatus(err?.response?.data?.message || "เกิดข้อผิดพลาด");
     }
   };
+  
 
   return (
+    <div>
+       <Navbar />
     <div className="p-6 max-w-xl mx-auto text-white">
       <h2 className="text-2xl font-bold mb-4">ยืนยันตัวตนเจ้าของประกัน</h2>
       <form onSubmit={handleSubmit} className="space-y-4 bg-[#26194d] p-4 rounded">
@@ -59,6 +62,7 @@ export default function RegisterOwnershipPage() {
         </button>
         <p className="mt-2">{status}</p>
       </form>
+    </div>
     </div>
   );//dwwdw
 }

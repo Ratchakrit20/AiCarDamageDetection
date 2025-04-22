@@ -10,18 +10,23 @@ export async function POST(req: NextRequest) {
 
     const { policy_number, firstName, lastName, user_id } = body;
 
-    // ✅ ตรวจสอบว่ามีกรมธรรม์จริงไหม
+    if (!policy_number || !firstName || !lastName || !user_id) {
+      return NextResponse.json({ message: "กรุณากรอกข้อมูลให้ครบ" }, { status: 400 });
+    }
+
+    console.log("🔎 Incoming verify:", { policy_number, firstName, lastName });
+
     const insurance = await CustomerInsurance.findOne({
       policy_number,
-      firstName,
-      lastName,
+      firstName: { $regex: `^${firstName.trim()}$`, $options: "i" },
+      lastName: { $regex: `^${lastName.trim()}$`, $options: "i" },
     });
+
 
     if (!insurance) {
       return NextResponse.json({ message: "ไม่พบข้อมูลประกันที่ตรงกัน" }, { status: 404 });
     }
 
-    // ✅ ตรวจสอบว่าผู้ใช้เคยยื่นคำขอไปแล้วหรือยัง
     const existingRequest = await InsuranceRequest.findOne({
       policy_number,
       user_id,
@@ -31,7 +36,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ message: "คุณได้ส่งคำขอไว้แล้ว รอการอนุมัติ" }, { status: 400 });
     }
 
-    // ✅ บันทึกคำขอใหม่
     await InsuranceRequest.create({
       policy_number,
       user_id,

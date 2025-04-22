@@ -5,7 +5,7 @@ const HowWork = () => {
     <div className="  p-10 rounded-[13px] mx-auto my-5 text-white">
       {/* Title */}
       <h2 className="text-center  text-2xl font-semibold mb-8">
-        How it Works
+      Our Process
         <div className="w-16 h-1 bg-primary-orange mx-auto mt-2"></div>
       </h2>
 
@@ -16,10 +16,10 @@ const HowWork = () => {
           <div className="flex flex-col items-center">
             <img
               src="/img/damage-classification.png"
-              alt="Damage Classification"
+              alt="Car Damage Detection"
               className="w-40 h-40 mb-6"
             />
-            <p className="text-lg font-medium text-center">Damage Classification</p>
+            <p className="text-lg font-medium text-center">Car Damage Detection</p>
           </div>
         </div>
 
@@ -57,7 +57,7 @@ const HowWork = () => {
               alt="Spare Parts Pricing Information"
               className="w-40 h-40 mb-6"
             />
-            <p className="text-lg font-medium text-center">AI Management</p>
+            <p className="text-lg font-medium text-center">Detect Damage with AI</p>
           </div>
         </div>
       </div>

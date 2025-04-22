@@ -107,6 +107,17 @@ function Navbar() {
 
 
                     )}
+                    {session?.user?.role === "admin" && (
+                      
+                      <Link
+                      href="/admin/manage-users"
+                      className="px-4 py-3 hover:bg-[#4a3a7d] flex items-center gap-2"
+                      >
+                      <FontAwesomeIcon size="lg" icon={faFileInvoice} />Manage users
+                      </Link>
+
+
+                    )}
                     <button
                       onClick={() => signOut()}
                       className="w-full text-left px-4 py-3 hover:bg-[#4a3a7d] flex items-center gap-2"

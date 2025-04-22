@@ -145,12 +145,14 @@ export default function CarDetect() {
       const allDamage = results.flatMap(r =>
         r.results[0].result.detection_results.map((damage) => ({
           part_name: damage.part_name.trim(),
+          damage_name: damage.damages[0]?.damage_name || "Unknown", // เพิ่ม damage_name
           overlap_ratio: Math.max(...(damage.damages ?? []).map((d) => d.overlap_ratio), 0) * 100,
           color: damage.color || "#999999",
           damages: damage.damages ?? [],
         }))
       );
-  
+
+
       // 🔁 รวม part_name ซ้ำ และรวม damage_name โดยเลือก overlap มากสุด
       const combined = Object.values(
         allDamage.reduce((acc, curr) => {
@@ -158,7 +160,7 @@ export default function CarDetect() {
             acc[curr.part_name] = { ...curr };
           } else {
             acc[curr.part_name].overlap_ratio = Math.max(acc[curr.part_name].overlap_ratio, curr.overlap_ratio);
-  
+
             const merged = new Map<string, DamageInfo>();
             [...acc[curr.part_name].damages, ...curr.damages].forEach((d) => {
               const existing = merged.get(d.damage_name);
@@ -166,17 +168,17 @@ export default function CarDetect() {
                 merged.set(d.damage_name, d);
               }
             });
-  
+
             acc[curr.part_name].damages = Array.from(merged.values());
           }
           return acc;
         }, {} as Record<string, DamageData>)
       );
-  
+
       setDamageData(combined);
     }
   }, [results, activeTab]);
-  
+
 
 
 
@@ -239,60 +241,74 @@ export default function CarDetect() {
       alert("❌ User ID not found. Please login again.");
       return;
     }
-
+  
+    // ดึงข้อมูลประกันก่อน upload
+    const carDetails = await fetchUserInsurance();
+    if (!carDetails) {
+      console.warn("🚫 ไม่มีข้อมูลประกัน ยกเลิกการส่งตรวจจับ");
+      return; // ⛔ ยกเลิกทันที ไม่ทำต่อแม้จะ upload ไปแล้ว
+    }
+  
     const formData = new FormData();
-
+  
     if (activeTab === "single") {
       if (!selectedFile) {
         alert("❌ Please upload an image before calculating.");
         return;
       }
-
-
+  
       const imageUrl = await uploadImage(selectedFile);
       const response = await fetch(imageUrl);
       const blob = await response.blob();
       const uploadedFile = new File([blob], selectedFile.name, { type: selectedFile.type });
-
+  
       formData.append("images", uploadedFile);
       setOriginalImages([imageUrl, ...Array(3).fill(null)]);
-
+  
     } else {
       const newOriginalImages: string[] = [];
-
+  
       for (const file of selectedFileMultiple) {
         if (file) {
           const imageUrl = await uploadImage(file);
           newOriginalImages.push(imageUrl);
-
+  
           const response = await fetch(imageUrl);
           const blob = await response.blob();
           const uploadedFile = new File([blob], file.name, { type: file.type });
-
+  
           formData.append("images", uploadedFile);
         }
       }
       setOriginalImages([...newOriginalImages]);
     }
-
+  
+    // ✅ ส่งตรวจจับต่อ เฉพาะถ้ามีประกัน
     await sendFormData(formData, userId);
   };
+  
 
 
   const fetchUserInsurance = async () => {
-    try {
-      const res = await fetch(`/api/user/getUserInsurance`, { credentials: "include" });
-      const data = await res.json();
+  try {
+    const res = await fetch(`/api/user/getUserInsurance`, { credentials: "include" });
+    const data = await res.json();
 
-      if (!res.ok) throw new Error(data.message || "Failed to fetch user insurance");
-
-      console.log("✅ Insurance Data:", data.insurance); // 🔹 ตรวจสอบข้อมูลรถ
-      return data.insurance;
-    } catch (error) {
-      console.error("❌ Fetch Insurance Error:", error);
-      return null;
+    if (!res.ok || !data.insurance) {
+      console.warn("No insurance found.");
+      alert("ไม่พบข้อมูลประกัน กรุณาลงทะเบียนก่อนใช้งาน");
+      return null; // หยุดไม่ให้ส่งต่อ แต่ไม่ throw
     }
-  };
+
+    console.log("Insurance Data:", data.insurance);
+    return data.insurance;
+  } catch (error) {
+    console.error("Fetch Insurance Error ", error);
+    alert("เกิดข้อผิดพลาดในการดึงข้อมูลประกัน กรุณาลองใหม่อีกครั้ง");
+    return null;
+  }
+};
+
 
   const sendFormData = async (formData: FormData, userId: string) => {
     try {
@@ -301,7 +317,7 @@ export default function CarDetect() {
       const carDetails = await fetchUserInsurance();
 
       const response = await axios.post<APIResponse>(
-        "https://b64b-34-80-124-189.ngrok-free.app/detect_damage_all/",
+        "https://1f2c-58-8-92-48.ngrok-free.app/detect_damage_all/",
         formData,
         { headers: { "Content-Type": "multipart/form-data" } }
       );
@@ -369,13 +385,13 @@ export default function CarDetect() {
       const uniqueDamages = Object.values(
         damageData.reduce((acc, curr) => {
           const partName = curr.part_name;
-      
+
           if (!acc[partName]) {
             acc[partName] = { ...curr };
           } else {
             // เอา overlap_ratio มากสุด
             acc[partName].overlap_ratio = Math.max(acc[partName].overlap_ratio, curr.overlap_ratio);
-      
+
             // รวม damage_name ที่ไม่ซ้ำ โดยเอา overlap สูงสุดของแต่ละชื่อ
             const merged = new Map<string, DamageInfo>();
             [...acc[partName].damages, ...curr.damages].forEach((d) => {
@@ -384,14 +400,14 @@ export default function CarDetect() {
                 merged.set(d.damage_name, d);
               }
             });
-      
+
             acc[partName].damages = Array.from(merged.values());
           }
-      
+
           return acc;
         }, {} as Record<string, DamageData>)
       );
-      
+
       const reportData = {
         report_id: uuidv4(),
         user_id: session.user.id,
@@ -414,7 +430,7 @@ export default function CarDetect() {
         })),
         total_cost: uniqueDamages.reduce((total, curr) => total + (curr.cost || 0), 0),
       };
-      
+
       console.log("Report Data:", reportData);
       // บันทึกรายงาน
       await axios.post('/api/saveDamageReport', reportData);
@@ -502,7 +518,7 @@ export default function CarDetect() {
                 ) : (
                   <>
                     <span className="font-medium">Single Car Damaged Image</span>
-                    <p className="text-sm">File should not exceed 5 MB</p>
+                    
                   </>
                 )}
 
@@ -535,7 +551,7 @@ export default function CarDetect() {
                       ) : (
                         <>
                           <span className="text-lg font-bold text-white">{position}</span>
-                          <p className="text-sm">File should not exceed 5 MB</p>
+                        
                         </>
                       )}
 
@@ -1063,10 +1079,20 @@ export default function CarDetect() {
                                     {/* Damage Types */}
                                     <td className=" border-b border-[#4a3a7d]/50  p-3">
                                       <div className="flex flex-wrap gap-2 justify-center">
-                                        {damage.damages.map((d, i) => (
+                                        {Array.from(
+                                          damage.damages.reduce((map, curr) => {
+                                            const existing = map.get(curr.damage_name);
+                                            if (!existing || curr.overlap_ratio > existing.overlap_ratio) {
+                                              map.set(curr.damage_name, curr);
+                                            }
+                                            return map;
+                                          }, new Map<string, DamageInfo>())
+                                            .values()
+                                        ).map((d, i) => (
                                           <span
                                             key={i}
-                                            className="bg-[#2e2649] border-2 text-white border-[#5e17eb] text-[10px] px-1 rounded-full">
+                                            className="bg-[#2e2649] border-2 text-white border-[#5e17eb] text-[10px] px-1 rounded-full"
+                                          >
                                             {d.damage_name}
                                           </span>
                                         ))}
@@ -1134,47 +1160,47 @@ export default function CarDetect() {
                 </div>
               )}
               <div className="mt-6 text-right font-bold text-white">
-  Overall Total Cost: {
-    Object.values(
-      results.flatMap(r =>
-        r.results[0].result.detection_results.map((damage) => {
-          const partName = damage.part_name.trim();
-          const overlap = Math.max(...(damage.damages ?? []).map(d => d.overlap_ratio), 0) * 100;
-          const isReplace = overlap > 50;
+                Overall Total Cost: {
+                  Object.values(
+                    results.flatMap(r =>
+                      r.results[0].result.detection_results.map((damage) => {
+                        const partName = damage.part_name.trim();
+                        const overlap = Math.max(...(damage.damages ?? []).map(d => d.overlap_ratio), 0) * 100;
+                        const isReplace = overlap > 50;
 
-          const pricing = pricingData.find((p) => p.name.trim() === partName);
+                        const pricing = pricingData.find((p) => p.name.trim() === partName);
 
-          const cost = isReplace
-            ? parseFloat(typeof pricing?.price === "number"
-              ? pricing.price.toString()
-              : pricing?.price?.$numberDecimal || '0')
-            : parseFloat(typeof pricing?.repair === "number"
-              ? pricing.repair.toString()
-              : pricing?.repair?.$numberDecimal || '0');
+                        const cost = isReplace
+                          ? parseFloat(typeof pricing?.price === "number"
+                            ? pricing.price.toString()
+                            : pricing?.price?.$numberDecimal || '0')
+                          : parseFloat(typeof pricing?.repair === "number"
+                            ? pricing.repair.toString()
+                            : pricing?.repair?.$numberDecimal || '0');
 
-          return {
-            part_name: partName,
-            overlap_ratio: overlap,
-            cost,
-          };
-        })
-      ).reduce((acc, curr) => {
-        // รวมเฉพาะ part_name ไม่ซ้ำ โดยใช้ค่า overlap ที่มากสุด
-        const exist = acc[curr.part_name];
-        if (!exist || curr.overlap_ratio > exist.overlap_ratio) {
-          acc[curr.part_name] = curr;
-        }
-        return acc;
-      }, {} as Record<string, { part_name: string; overlap_ratio: number; cost: number }>)
-    )
-    .reduce((total, curr) => total + (curr.cost || 0), 0)
-    .toLocaleString('en-US', {
-      style: 'currency',
-      currency: 'THB',
-      minimumFractionDigits: 0
-    })
-  }
-</div>
+                        return {
+                          part_name: partName,
+                          overlap_ratio: overlap,
+                          cost,
+                        };
+                      })
+                    ).reduce((acc, curr) => {
+                      // รวมเฉพาะ part_name ไม่ซ้ำ โดยใช้ค่า overlap ที่มากสุด
+                      const exist = acc[curr.part_name];
+                      if (!exist || curr.overlap_ratio > exist.overlap_ratio) {
+                        acc[curr.part_name] = curr;
+                      }
+                      return acc;
+                    }, {} as Record<string, { part_name: string; overlap_ratio: number; cost: number }>)
+                  )
+                    .reduce((total, curr) => total + (curr.cost || 0), 0)
+                    .toLocaleString('en-US', {
+                      style: 'currency',
+                      currency: 'THB',
+                      minimumFractionDigits: 0
+                    })
+                }
+              </div>
 
               <button
                 className="w-full mt-4 bg-[#5e17eb] text-white py-2 px-4 rounded-lg"

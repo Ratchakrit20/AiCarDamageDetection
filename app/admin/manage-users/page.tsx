@@ -19,10 +19,12 @@ interface Insurance {
   coverage_details?: string;
   status: "pending" | "approved" | "rejected";
   registered_car_image?: string;
+  firstName?: string;
+  lastName?: string;
 }
 
 export default function AdminInsurancePage() {
-  const { data: session } = useSession(); // ✅ ดึง session
+  const { data: session } = useSession();
   const userId = session?.user?.id || "67ae32d64ab6d19082b86ddd";
   const [formData, setFormData] = useState<Insurance>({
     policy_number: "",
@@ -36,6 +38,8 @@ export default function AdminInsurancePage() {
     claim_limit: 0,
     coverage_details: "",
     status: "pending",
+    firstName: "",
+    lastName: "",
   });
   const [insuranceList, setInsuranceList] = useState<Insurance[]>([]);
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -57,7 +61,10 @@ export default function AdminInsurancePage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: name === 'car_year' || name === 'claim_limit' ? parseFloat(value) : value }));
+    setFormData((prev) => ({
+      ...prev,
+      [name]: name === "car_year" || name === "claim_limit" ? parseFloat(value) : value,
+    }));
   };
 
   const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -82,12 +89,9 @@ export default function AdminInsurancePage() {
         imageUrl = uploadData.url;
       }
 
-      // ✅ 1. Generate customer_ins จาก backend
       const genRes = await axios.get<{ customer_ins: number }>("/api/admin/generateCustomerIns");
       const generatedCustomerIns = genRes.data.customer_ins;
-      console.log("🧪 Generated:", genRes.data);
 
-      // ✅ 2. สร้าง payload พร้อม user_id และ customer_ins
       const payload = {
         ...formData,
         registered_car_image: imageUrl,
@@ -113,6 +117,8 @@ export default function AdminInsurancePage() {
         claim_limit: 0,
         coverage_details: "",
         status: "pending",
+        firstName: "",
+        lastName: "",
       });
       setImageFile(null);
       setEditId(null);
@@ -143,7 +149,7 @@ export default function AdminInsurancePage() {
       <Navbar />
       <div className="max-w-5xl mx-auto p-6 mt-8">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-2xl font-bold">รายการข้อมูลประกัน</h2>
+          <h2 className="text-2xl font-bold">Insurance information list</h2>
           <button
             className="bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded"
             onClick={() => setIsFormVisible(!isFormVisible)}>
@@ -154,6 +160,8 @@ export default function AdminInsurancePage() {
         {isFormVisible && (
           <form onSubmit={handleSubmit} className="bg-[#26194d] p-4 rounded mb-6 space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <input name="firstName" placeholder="First Name" value={formData.firstName} onChange={handleChange} className="p-2 rounded bg-gray-900" required />
+              <input name="lastName" placeholder="Last Name" value={formData.lastName} onChange={handleChange} className="p-2 rounded bg-gray-900" required />
               <input name="policy_number" placeholder="Policy Number" value={formData.policy_number} onChange={handleChange} className="p-2 rounded bg-gray-900" required />
               <select name="insurance_type" value={formData.insurance_type} onChange={handleChange} className="p-2 rounded bg-gray-900">
                 <option value="Full Coverage">Full Coverage</option>
@@ -169,12 +177,7 @@ export default function AdminInsurancePage() {
               <input type="number" name="claim_limit" placeholder="Claim Limit" value={formData.claim_limit} onChange={handleChange} className="p-2 rounded bg-gray-900" required />
               <input type="file" accept="image/*" onChange={handleImageChange} className="text-white" />
             </div>
-            <select name="coverage_details" value={formData.coverage_details} onChange={handleChange} className="p-2 rounded bg-gray-900 w-full">
-              <option value="">-- Select Coverage --</option>
-              <option value="Full Coverage">Full Coverage</option>
-              <option value="Third Party">Third Party</option>
-              <option value="Other">Other</option>
-            </select>
+           
             <button type="submit" className="bg-green-600 px-4 py-2 rounded">💾 บันทึก</button>
           </form>
         )}
@@ -184,6 +187,7 @@ export default function AdminInsurancePage() {
             <div key={insurance._id} className="bg-[#2a1b4d] p-4 rounded shadow-md">
               <div className="flex justify-between">
                 <div>
+                  <p><strong>ชื่อ:</strong> {insurance.firstName} {insurance.lastName}</p>
                   <p><strong>Policy:</strong> {insurance.policy_number}</p>
                   <p><strong>Car:</strong> {insurance.car_brand} {insurance.car_model} ({insurance.car_year})</p>
                   <p><strong>License Plate:</strong> {insurance.license_plate}</p>
