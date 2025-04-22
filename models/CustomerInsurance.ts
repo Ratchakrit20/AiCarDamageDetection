@@ -15,12 +15,17 @@ interface ICustomerInsurance extends Document {
   coverage_details?: string;
   status: "pending" | "approved" | "rejected";
   rejection_reason?: string;
-  registered_car_image?: string; // ✅ เพิ่มตรงนี้
+  registered_car_image?: string; 
+  firstName: string;
+  lastName: string;
 }
 
 const customerInsuranceSchema = new Schema<ICustomerInsurance>({
+
   customer_ins: { type: Number, required: true, unique: true },
-  user_id: { type: Schema.Types.ObjectId, ref: "User", required: true },
+  firstName: { type: String, required: true },
+  lastName: { type: String, required: true },
+  user_id: { type: Schema.Types.ObjectId, ref: "User" },
   policy_number: { type: String, required: true, unique: true },
   insurance_type: { type: String, required: true },
   policy_start_date: { type: Date, required: true },
@@ -33,7 +38,7 @@ const customerInsuranceSchema = new Schema<ICustomerInsurance>({
   coverage_details: { type: String },
   status: { type: String, enum: ["pending", "approved", "rejected"], default: "pending" },
   rejection_reason: { type: String },
-  registered_car_image: { type: String }, 
+  registered_car_image: { type: String }, // ✅ เพิ่มตรงนี้
 }, {
   timestamps: true,
 });

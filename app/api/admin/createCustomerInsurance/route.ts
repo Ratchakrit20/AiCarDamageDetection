@@ -1,11 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { connectMongoDB } from "@/lib/mongodb";
 import CustomerInsurance from "@/models/CustomerInsurance";
+import mongoose from "mongoose";
 
 export async function POST(req: NextRequest) {
   try {
     await connectMongoDB();
     const data = await req.json();
+
+    // Log ตรวจสอบข้อมูลก่อนสร้าง
+    console.log("Incoming Insurance Data:", data);
+
+    // ตรวจสอบและแปลงข้อมูลสำคัญ
+    if (!data.user_id || !data.customer_ins || !data.policy_number || !data.claim_limit) {
+      return NextResponse.json({ success: false, message: "Missing required fields" }, { status: 400 });
+    }
+
+    data.claim_limit = mongoose.Types.Decimal128.fromString(data.claim_limit.toString());
+    data.user_id = new mongoose.Types.ObjectId(data.user_id);
 
     const newInsurance = new CustomerInsurance(data);
     await newInsurance.save();
@@ -14,12 +26,13 @@ export async function POST(req: NextRequest) {
       success: true,
       message: "Insurance created successfully",
     }, { status: 201 });
+
   } catch (error) {
     console.error("❌ Failed to create insurance:", error);
     return NextResponse.json({
       success: false,
       message: "Failed to create insurance",
-      error
+      error: error instanceof Error ? error.message : error
     }, { status: 500 });
   }
 }

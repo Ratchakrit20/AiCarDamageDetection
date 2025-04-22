@@ -13,16 +13,16 @@ interface DamageReport {
     car_info: { brand: string; model: string; year: string };
     images: string[];
     damages: {
-      damage_part: string;
-      detected_type: string;
-      confidence: number;
-      action_required: string;
-      cost: number;
+        damage_part: string;
+        detected_type: string;
+        confidence: number;
+        action_required: string;
+        cost: number;
     }[];
     total_cost: number;
     status: string;
-  }
-  
+}
+
 
 export default function AdminPage() {
     const { data: session, status } = useSession();
@@ -49,13 +49,13 @@ export default function AdminPage() {
                     _id: report._id || "",
                     report_id: report.report_id || "",
                     user_id: report.user_id
-                    ? {
-                        _id: report.user_id._id, 
-                        firstName: report.user_id.firstName,
-                        lastName: report.user_id.lastName,
-                      }
-                    : null,
-                                      car_info: report.car_info || { brand: "", model: "", year: "" },
+                        ? {
+                            _id: report.user_id._id,
+                            firstName: report.user_id.firstName,
+                            lastName: report.user_id.lastName,
+                        }
+                        : null,
+                    car_info: report.car_info || { brand: "", model: "", year: "" },
                     images: report.images || [],
                     damages: report.damages || [],
                     total_cost: report.total_cost || 0,
@@ -94,16 +94,21 @@ export default function AdminPage() {
             const registeredImage = data?.registered_car_image || null;
 
             if (!images.length && !registeredImage) {
-                alert("No images available");
+                alert("ไม่มีภาพให้แสดง");
                 return;
             }
 
-            setSelectedImages([...images, ...(registeredImage ? [registeredImage] : [])]);
+            const allImages = [...images];
+            if (registeredImage) allImages.push(registeredImage); // รวม registered car image ด้วย
+
+            setSelectedImages(allImages);
             setIsImageModalOpen(true);
         } catch (error) {
-            console.error("❌ Failed to fetch registered car image:", error);
+            console.error("❌ ไม่สามารถดึง registered image:", error);
         }
     };
+
+
 
 
     const closeImageModal = () => {
@@ -171,15 +176,15 @@ export default function AdminPage() {
                                         </table>
                                     </td>
                                     <td className="p-3">
-  <div className="flex gap-2">
-    <button
-      onClick={() => handleViewImages(report.images, report.user_id!._id)}
-      className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-full"
-    >
-      View
-    </button>
-  </div>
-</td>
+                                        <div className="flex gap-2">
+                                            <button
+                                                onClick={() => handleViewImages(report.images, report.user_id!._id)}
+                                                className="bg-blue-600 hover:bg-blue-700 px-3 py-1 rounded-full"
+                                            >
+                                                View
+                                            </button>
+                                        </div>
+                                    </td>
 
                                     <td className="p-3 font-semibold">฿{report.total_cost}</td>
                                     <td className="p-3 space-x-2">
@@ -236,21 +241,49 @@ export default function AdminPage() {
 
                 {isImageModalOpen && (
                     <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white text-black p-6 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-auto">
-                            <h2 className="text-xl font-bold mb-4">Damage Images</h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {selectedImages.map((image, index) => (
-                                    <div key={index} className="rounded overflow-hidden">
-                                        <img src={image} alt={`Damage ${index}`} className="w-full h-48 object-cover rounded-lg" />
+                        <div className="bg-white text-black p-6 rounded-lg max-w-5xl w-full max-h-[90vh] overflow-auto">
+                            <h2 className="text-2xl font-bold mb-4 text-center">Images Report</h2>
+
+                            {/* 🔧 Damage Images */}
+                            <div className="mb-6">
+                                <h3 className="text-lg font-semibold mb-2 text-black">Damage images</h3>
+                                {selectedImages.length > 1 ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {selectedImages.slice(0, -1).map((image, index) => (
+                                            <div key={index} className="rounded overflow-hidden">
+                                                <img src={image} alt={`Damage ${index}`} className="w-full h-48 object-cover rounded-lg" />
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
+                                ) : (
+                                    <p className="text-sm text-gray-600 italic">ไม่มีภาพความเสียหาย</p>
+                                )}
                             </div>
-                            <button onClick={closeImageModal} className="mt-6 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-full">
+
+                            {/* 🚗 Registered Car Image */}
+                            <div className="mb-6">
+                                <h3 className="text-lg font-semibold mb-2 text-black">Registered Image</h3>
+                                {selectedImages.length > 0 ? (
+                                    <img
+                                        src={selectedImages[selectedImages.length - 1]}
+                                        alt="Registered Car"
+                                        className="w-full max-w-md mx-auto rounded-lg shadow-lg"
+                                    />
+                                ) : (
+                                    <p className="text-sm text-gray-600 italic">ไม่มีภาพรถที่ลงทะเบียน</p>
+                                )}
+                            </div>
+
+                            <button
+                                onClick={closeImageModal}
+                                className="mt-6 bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-full block mx-auto"
+                            >
                                 Close
                             </button>
                         </div>
                     </div>
                 )}
+
             </div>
         </div>
     );

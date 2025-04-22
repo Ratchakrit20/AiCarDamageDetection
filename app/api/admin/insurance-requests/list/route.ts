@@ -8,10 +8,7 @@ export async function GET() {
     await connectMongoDB();
 
     const requests = await InsuranceRequest.find()
-      .populate("user_id", "firstName lastName")
-      .populate("customer_ins"); // ดึงข้อมูลประกันทั้งหมดมาเลย
-
-      
+      .populate("user_id", "firstName lastName"); // ✅ แค่ populate user พอแล้ว
 
     return NextResponse.json({ data: requests }, { status: 200 });
   } catch (err: any) {
