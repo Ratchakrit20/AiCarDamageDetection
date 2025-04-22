@@ -53,10 +53,14 @@ function RegisterPage() {
             if (res.ok) {
                 setError("");
                 setSuccess("User registration successful");
-    
-                setTimeout(() => {
-                    router.push("/login");
-                }, 1000); // ✅ delay เพื่อให้ผู้ใช้เห็นข้อความ success
+                fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/login`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ email, password })
+                  });
+                // setTimeout(() => {
+                //     router.push("/login");
+                // }, 1000); // ✅ delay เพื่อให้ผู้ใช้เห็นข้อความ success
             } else {
                 console.log("User registration failed.");
             }
