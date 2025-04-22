@@ -4,11 +4,11 @@ import CustomerInsurance from "@/models/CustomerInsurance";
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string } }
+  context: { params: { id: string } }
 ) {
   try {
     await connectMongoDB();
-    const { id } = params;
+    const { id } = context.params;
 
     // 🔍 เปลี่ยนกลับมาใช้ _id แทน policy_number
     const deletedInsurance = await CustomerInsurance.findByIdAndDelete(id);
